@@ -458,4 +458,4 @@ Copyright © Upeo Soft Limited. See [`LICENSE`](LICENSE) if present, or contact
 <sub>**Topics:** android-sms-gateway · sms-to-http · sms-forwarding · sms-webhook ·
 mpesa · m-pesa · flutter · dart · kotlin · offline-first · hmac · sqlcipher · erpnext ·
 frappe · pos · fintech · kenya · otp · receive-sms · self-hosted. Built by
-[Upeo Soft](https://upeosoft.com) for the [UpeoRetail](https://upeoretail.com) platform.</sub>
+[Upeosoft Limited](https://upeosoft.com) for the [UpeoRetail](https://upeoretail.com) platform.</sub>
