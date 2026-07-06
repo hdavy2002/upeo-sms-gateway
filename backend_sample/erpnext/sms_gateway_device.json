@@ -1,0 +1,18 @@
+{
+  "doctype": "DocType",
+  "name": "SMS Gateway Device",
+  "module": "Upeo Gateway",
+  "custom": 1,
+  "fields": [
+    { "fieldname": "device_id", "label": "Device ID", "fieldtype": "Data", "unique": 1, "reqd": 1, "in_list_view": 1 },
+    { "fieldname": "secret_hash", "label": "Secret (store hashed in prod)", "fieldtype": "Password", "reqd": 1 },
+    { "fieldname": "last_heartbeat", "label": "Last Heartbeat", "fieldtype": "Datetime", "in_list_view": 1 },
+    { "fieldname": "last_app_version", "label": "Last App Version", "fieldtype": "Data" },
+    { "fieldname": "last_battery", "label": "Last Battery", "fieldtype": "Int" },
+    { "fieldname": "pending", "label": "Pending", "fieldtype": "Int" },
+    { "fieldname": "failed", "label": "Failed", "fieldtype": "Int" }
+  ],
+  "permissions": [
+    { "role": "System Manager", "read": 1, "write": 1, "create": 1, "delete": 1 }
+  ]
+}
