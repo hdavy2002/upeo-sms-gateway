@@ -37,8 +37,9 @@ class InboxBackfill {
   Future<void> drain() async {
     if (!await store.acquireInboxLease(owner, now())) return;
     try {
-      var cursor = await store.inboxCheckpoint();
-      if (cursor == null) {
+      final savedCheckpoint = await store.inboxCheckpoint();
+      InboxCheckpoint cursor;
+      if (savedCheckpoint == null) {
         final upper = now();
         final last = await store.inboxCompletedAt();
         // Never apply a sliding lookback to an existing watermark: a long
@@ -46,6 +47,8 @@ class InboxBackfill {
         final floor = last == null ? upper - initialLookbackMs : last - overlapMs;
         cursor = InboxCheckpoint(floor < 0 ? 0 : floor, -1, upper);
         await store.commitInboxPage(owner, [], cursor, false, now());
+      } else {
+        cursor = savedCheckpoint;
       }
       for (var page = 0; page < maxPages; page++) {
         final rows = await reader(cursor.afterDate, cursor.afterId,
