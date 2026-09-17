@@ -31,10 +31,10 @@ class SmsInboxTest {
             val c = MatrixCursor(arrayOf("_id", "address", "body", "date", "sub_id"))
             for (row in 1L..501L) {
                 if (500L <= upper && (500L > date || (500L == date && row > id)))
-                    c.addRow(arrayOf(row, "TEST-HDFCBK", "synthetic", 500L, 1))
+                    c.addRow(arrayOf<Any?>(row, "TEST-HDFCBK", "synthetic", 500L, 1))
             }
             // A future row must not leak into this scan's frozen window.
-            if (2000L <= upper && 2000L > date) c.addRow(arrayOf(900L,"TEST","future",2000L,1))
+            if (2000L <= upper && 2000L > date) c.addRow(arrayOf<Any?>(900L, "TEST", "future", 2000L, 1))
             return c
         }
         override fun getType(uri: Uri): String? = null
