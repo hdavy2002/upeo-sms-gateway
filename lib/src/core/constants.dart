@@ -17,7 +17,7 @@ class K {
   static const String versionPath = '/api/app/version';
 
   // ----- Defaults -----
-  static const List<String> defaultAllowlist = ['HDFCBK', 'HDFCBN'];
+  static const List<String> defaultAllowlist = ['HDFCBK', 'HDFCBN', 'HDFCBANK'];
   static const int defaultRetentionDays = 14;
 
   // ----- Sync / retry policy -----

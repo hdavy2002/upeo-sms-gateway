@@ -52,7 +52,7 @@ void main() {
 
   group('HDFC capture filter', () {
     test('exact bank header with DLT prefix/category is accepted', () {
-      for (final sender in ['HDFCBK', 'ad-hdfcbk', 'VM-HDFCBK-S', 'HDFCBN-T']) {
+      for (final sender in ['HDFCBK', 'ad-hdfcbk', 'VM-HDFCBK-S', 'HDFCBN-T', 'JX-HDFCBANK-S']) {
         expect(stagingConfig.senderAllowed(sender), isTrue, reason: sender);
         expect(stagingConfig.paymentSmsAllowed(sender, paymentBody), isTrue);
       }

@@ -67,6 +67,8 @@ class AppConfig {
         r'^(?:[A-Z]{2}-)?(HDFC[A-Z0-9]{2,6})(?:-[SPTG])?$',
       ).firstMatch(value.trim().toUpperCase())?.group(1);
 
+  static const _supportedHdfcHeaders = {'HDFCBK', 'HDFCBN', 'HDFCBANK'};
+
   static String? validateAllowlist(List<String> values) =>
       values.isNotEmpty && values.every((v) => _bankHeader(v) != null)
           ? null : 'Enter exact HDFC sender headers, separated by commas';
@@ -81,7 +83,11 @@ class AppConfig {
   /// Case-insensitive exact HDFC header match; no wildcard/substring matches.
   bool senderAllowed(String sender) {
     final header = _bankHeader(sender);
-    return header != null && allowlist.any((v) => _bankHeader(v) == header);
+    // One configured HDFC header opts into the known HDFC sender family. This
+    // covers carrier/DLT variations such as JX-HDFCBK-S, VM-HDFCBN-T and
+    // HDFCBANK without allowing unrelated senders or arbitrary substrings.
+    return header != null && _supportedHdfcHeaders.contains(header) &&
+        allowlist.any((v) => _supportedHdfcHeaders.contains(_bankHeader(v)));
   }
 
   /// Conservative capture filter, NOT payment validation. The Worker must parse
