@@ -43,3 +43,6 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Local production companion credential; never commit or upload.
+PROD_DEVICE_SECRET.txt
