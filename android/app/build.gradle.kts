@@ -36,7 +36,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "ai.avatok.sms_companion"
+        applicationId = "ai.avatok.sms_companion.test"
         // minSdk 24 (Android 7.0) — required for modern foreground-service and
         // SubscriptionManager APIs used by the gateway.
         minSdk = maxOf(24, flutter.minSdkVersion)

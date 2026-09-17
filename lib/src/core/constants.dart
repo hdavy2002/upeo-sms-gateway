@@ -3,7 +3,7 @@ class K {
   K._();
 
   static const String appName = 'AvaTOK SMS Gateway · Production';
-  static const String applicationId = 'ai.avatok.sms_companion';
+  static const String applicationId = 'ai.avatok.sms_companion.test';
   // Exact production origin. No runtime HTTP/host override.
   static const String productionBaseUrl = 'https://api.avatok.ai';
 
