@@ -231,7 +231,7 @@ class SmsForegroundService : Service() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("AvaTOK SMS · Staging")
+            .setContentTitle("AvaTOK SMS · Production")
             .setContentText(text ?: "Gateway running — HDFC payment alerts to production")
             .setSmallIcon(android.R.drawable.stat_notify_sync)
             .setOngoing(true)

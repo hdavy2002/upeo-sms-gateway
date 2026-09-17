@@ -101,7 +101,7 @@ class _ConfigFormState extends ConsumerState<ConfigForm> {
       if (!mounted) return;
       final ok = res.outcome == SendOutcome.success;
       _snack(
-        ok ? 'Staging heartbeat accepted — no SMS sent' : 'Test failed: ${res.detail}',
+        ok ? 'Production heartbeat accepted — no SMS sent' : 'Test failed: ${res.detail}',
         error: !ok,
       );
     } catch (_) {
@@ -150,7 +150,7 @@ class _ConfigFormState extends ConsumerState<ConfigForm> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const Text(
-                'Staging only · HDFC payment SMS · Sideload companion',
+                'Production only · HDFC payment SMS · Sideload companion',
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 12),

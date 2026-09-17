@@ -35,7 +35,7 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Set up AvaTOK SMS · Staging')),
+      appBar: AppBar(title: const Text('Set up AvaTOK SMS · Production')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
