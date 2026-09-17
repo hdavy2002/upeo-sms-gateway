@@ -84,6 +84,12 @@ flutter {
     source = "../.."
 }
 
+// Resource-enabled host tests consume the assets populated by Flutter's task.
+// AGP does not infer that producer dependency for PackageForHostTest.
+tasks.matching { it.name == "packageDebugUnitTestForUnitTest" }.configureEach {
+    dependsOn("copyFlutterAssetsDebug")
+}
+
 dependencies {
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.robolectric:robolectric:4.14.1")
