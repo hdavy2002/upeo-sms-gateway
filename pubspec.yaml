@@ -1,5 +1,5 @@
 name: upeo_sms_gateway
-description: "AvaTOK staging HDFC payment-SMS companion, based on Upeo (sideload-only)."
+description: "AvaTOK production HDFC payment-SMS companion, based on Upeo (sideload-only)."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev

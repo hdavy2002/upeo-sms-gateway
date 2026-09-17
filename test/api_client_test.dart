@@ -57,7 +57,7 @@ void main() {
     expect(adapter.requests, hasLength(1));
     final request = adapter.requests.single;
     expect(request.method, 'POST');
-    expect(request.uri.toString(), '${K.stagingBaseUrl}${K.heartbeatPath}');
+    expect(request.uri.toString(), '${K.productionBaseUrl}${K.heartbeatPath}');
     expect(request.followRedirects, isFalse);
     expect(request.maxRedirects, 0);
     final payload = request.data as Map;

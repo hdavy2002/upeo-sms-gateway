@@ -120,7 +120,7 @@ class _ConfigFormState extends ConsumerState<ConfigForm> {
       _secretCtrl.text = base64Url.encode(bytes);
       _secretVisible = false;
     });
-    _snack('Secret generated — register the same value for this staging device');
+    _snack('Secret generated — register the same value for this production device');
   }
 
   void _snack(String msg, {bool error = false}) {
@@ -157,9 +157,9 @@ class _ConfigFormState extends ConsumerState<ConfigForm> {
               TextFormField(
                 controller: _urlCtrl,
                 decoration: const InputDecoration(
-                  labelText: 'AvaTOK staging Worker base URL',
-                  hintText: 'https://api-staging.avatok.ai',
-                  helperText: 'Only the AvaTOK staging HTTPS origin is accepted.',
+                  labelText: 'AvaTOK production Worker base URL',
+                  hintText: 'https://api.avatok.ai',
+                  helperText: 'Only the AvaTOK production HTTPS origin is accepted.',
                   helperMaxLines: 2,
                   border: OutlineInputBorder(),
                 ),
@@ -173,7 +173,7 @@ class _ConfigFormState extends ConsumerState<ConfigForm> {
                   labelText: 'Device ID',
                   hintText: 'AVATOK_HDFC_STAGING_01',
                   helperText:
-                      'Must match this phone’s registered AvaTOK staging device ID.',
+                      'Must match this phone’s registered AvaTOK production device ID.',
                   helperMaxLines: 3,
                   border: OutlineInputBorder(),
                 ),
@@ -188,7 +188,7 @@ class _ConfigFormState extends ConsumerState<ConfigForm> {
                 decoration: InputDecoration(
                   labelText: 'Device secret key (HMAC)',
                   helperText:
-                      'A shared secret you generate, registered in staging '
+                      'A shared secret you generate, registered in production '
                       'for this Device ID. Tap the key icon to generate one.',
                   helperMaxLines: 3,
                   border: const OutlineInputBorder(),

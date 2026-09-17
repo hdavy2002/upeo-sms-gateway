@@ -24,7 +24,7 @@ class AppConfig {
   });
 
   static const AppConfig empty = AppConfig(
-    apiBaseUrl: K.stagingBaseUrl,
+    apiBaseUrl: K.productionBaseUrl,
     deviceId: '',
     secretKey: '',
     allowlist: K.defaultAllowlist,
@@ -38,12 +38,12 @@ class AppConfig {
 
   static String? validateBaseUrl(String value) {
     final uri = Uri.tryParse(value);
-    final expected = Uri.parse(K.stagingBaseUrl);
+    final expected = Uri.parse(K.productionBaseUrl);
     if (uri == null || uri.scheme != 'https' ||
         uri.host != expected.host || uri.port != 443 ||
         uri.userInfo.isNotEmpty || uri.hasQuery || uri.hasFragment ||
         (uri.path.isNotEmpty && uri.path != '/')) {
-      return 'Use the AvaTOK staging Worker root: ${K.stagingBaseUrl}';
+      return 'Use the AvaTOK production Worker root: ${K.productionBaseUrl}';
     }
     return null;
   }
@@ -72,7 +72,7 @@ class AppConfig {
           ? null : 'Enter exact HDFC sender headers, separated by commas';
 
   String? get validationError => validateBaseUrl(apiBaseUrl) ??
-      (allowInsecureHttp ? 'HTTP is disabled in this staging companion' : null) ??
+      (allowInsecureHttp ? 'HTTP is disabled in this production companion' : null) ??
       validateDeviceId(deviceId) ?? validateSecret(secretKey) ??
       validateAllowlist(allowlist) ?? validateAccountSuffix(accountSuffix) ??
       (retentionDays < 3 || retentionDays > 90

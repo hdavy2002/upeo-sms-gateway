@@ -63,7 +63,7 @@ class _AboutScreenState extends ConsumerState<AboutScreen> {
             leading: Icon(Icons.sms, size: 40),
             title: Text(K.appName,
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            subtitle: Text('HDFC payment SMS · staging · sideload only'),
+            subtitle: Text('HDFC payment SMS · production · sideload only'),
           ),
           _card('App', [
             _kv('Version', _version),
@@ -95,7 +95,7 @@ class _AboutScreenState extends ConsumerState<AboutScreen> {
                 'and configured account suffix are stored '
                 '(encrypted at rest) and forwarded over HTTPS with an HMAC '
                 'signature. Non-allowlisted messages are never stored or sent. '
-                'Destination: AvaTOK staging only. Based on Upeo SMS Gateway.',
+                'Destination: AvaTOK production only. Based on Upeo SMS Gateway.',
                 style: TextStyle(fontSize: 12),
               ),
             ),

@@ -5,9 +5,9 @@ import 'package:upeo_sms_gateway/src/core/constants.dart';
 import 'fixtures.dart';
 
 void main() {
-  group('staging boundary', () {
+  group('production boundary', () {
     test('defaults have no credentials or account and cannot forward', () {
-      expect(AppConfig.empty.apiBaseUrl, K.stagingBaseUrl);
+      expect(AppConfig.empty.apiBaseUrl, K.productionBaseUrl);
       expect(AppConfig.empty.deviceId, isEmpty);
       expect(AppConfig.empty.secretKey, isEmpty);
       expect(AppConfig.empty.accountSuffix, isEmpty);
@@ -16,15 +16,15 @@ void main() {
     });
 
     test('only the pinned HTTPS root is valid', () {
-      for (final url in [K.stagingBaseUrl, '${K.stagingBaseUrl}/', '${K.stagingBaseUrl}:443']) {
+      for (final url in [K.productionBaseUrl, '${K.productionBaseUrl}/', '${K.productionBaseUrl}:443']) {
         expect(AppConfig.validateBaseUrl(url), isNull, reason: url);
       }
       for (final url in [
-        '', 'https://example.invalid', 'http://api-staging.avatok.ai',
-        '${K.stagingBaseUrl}.example.invalid', '${K.stagingBaseUrl}:444',
-        '${K.stagingBaseUrl}/api', '${K.stagingBaseUrl}?next=elsewhere',
-        '${K.stagingBaseUrl}#fragment',
-        'https://user@api-staging.avatok.ai',
+        '', 'https://example.invalid', 'http://api.avatok.ai',
+        '${K.productionBaseUrl}.example.invalid', '${K.productionBaseUrl}:444',
+        '${K.productionBaseUrl}/api', '${K.productionBaseUrl}?next=elsewhere',
+        '${K.productionBaseUrl}#fragment',
+        'https://user@api.avatok.ai',
       ]) {
         expect(AppConfig.validateBaseUrl(url), isNotNull, reason: url);
       }

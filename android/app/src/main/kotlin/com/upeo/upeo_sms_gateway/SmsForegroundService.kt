@@ -232,7 +232,7 @@ class SmsForegroundService : Service() {
         )
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("AvaTOK SMS · Staging")
-            .setContentText(text ?: "Gateway running — HDFC payment alerts to staging")
+            .setContentText(text ?: "Gateway running — HDFC payment alerts to production")
             .setSmallIcon(android.R.drawable.stat_notify_sync)
             .setOngoing(true)
             .setOnlyAlertOnce(true)

@@ -43,7 +43,7 @@ class ApiClient {
     final dio = Dio(BaseOptions(
       // Runtime configuration must validate too; using the pinned origin here
       // prevents even an accidentally bypassed validator reaching another host.
-      baseUrl: K.stagingBaseUrl,
+      baseUrl: K.productionBaseUrl,
       followRedirects: false,
       maxRedirects: 0,
       connectTimeout: const Duration(seconds: 15),
@@ -86,7 +86,7 @@ class ApiClient {
 
   Future<SendResult> sendIncoming(SmsRecord r) async {
     if (!_cfg.isComplete) {
-      return const SendResult(SendOutcome.permanent, 'invalid staging configuration');
+      return const SendResult(SendOutcome.permanent, 'invalid production configuration');
     }
     if (r.deviceId != _cfg.deviceId || !_cfg.paymentSmsAllowed(r.sender, r.message)) {
       return const SendResult(SendOutcome.permanent, 'queued SMS does not match current configuration');
@@ -123,7 +123,7 @@ class ApiClient {
   /// Signed heartbeat. Doubles as the "Test Connection" handshake.
   Future<SendResult> sendHeartbeat(Map<String, dynamic> health) async {
     if (!_cfg.isComplete) {
-      return const SendResult(SendOutcome.permanent, 'invalid staging configuration');
+      return const SendResult(SendOutcome.permanent, 'invalid production configuration');
     }
     final nonce = _uuid.v4();
     final sentAt = TimeUtils.nowEat();

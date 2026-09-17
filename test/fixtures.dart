@@ -5,7 +5,7 @@ import 'package:upeo_sms_gateway/src/data/sms_message.dart';
 
 // Synthetic data only. This is not a provisioned device or bank account.
 const stagingConfig = AppConfig(
-  apiBaseUrl: K.stagingBaseUrl,
+  apiBaseUrl: K.productionBaseUrl,
   deviceId: 'TEST_STAGING_DEVICE',
   secretKey: 'synthetic-test-secret-not-a-credential',
   allowlist: K.defaultAllowlist,

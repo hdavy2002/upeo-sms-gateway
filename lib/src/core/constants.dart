@@ -2,11 +2,10 @@
 class K {
   K._();
 
-  static const String appName = 'AvaTOK SMS Gateway · Staging';
-  static const String applicationId = 'ai.avatok.sms_companion.staging';
-  // Exact origin, verified against the main app's staging configuration.
-  // No production fallback and no runtime HTTP/host override.
-  static const String stagingBaseUrl = 'https://api-staging.avatok.ai';
+  static const String appName = 'AvaTOK SMS Gateway · Production';
+  static const String applicationId = 'ai.avatok.sms_companion';
+  // Exact production origin. No runtime HTTP/host override.
+  static const String productionBaseUrl = 'https://api.avatok.ai';
 
   // ----- MethodChannels (must match the Kotlin side) -----
   static const String nativeChannel = 'upeo/native';

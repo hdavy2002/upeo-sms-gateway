@@ -22,7 +22,7 @@ class ConfigRepository {
   static const _kRetention = 'cfg_retention_days';
   static const _kAllowHttp = 'cfg_allow_http';
   static const _kDbKey = 'db_encryption_key';
-  static const _kSnapshot = 'avatok_staging_config_v1';
+  static const _kSnapshot = 'avatok_production_config_v1';
 
   Future<AppConfig> load() async {
     final all = await _storage.readAll();
@@ -47,7 +47,7 @@ class ConfigRepository {
       allowlist = (jsonDecode(allowlistRaw) as List).cast<String>();
     }
     return AppConfig(
-      apiBaseUrl: all[_kBaseUrl] ?? K.stagingBaseUrl,
+      apiBaseUrl: all[_kBaseUrl] ?? K.productionBaseUrl,
       deviceId: all[_kDeviceId] ?? '',
       secretKey: all[_kSecret] ?? '',
       allowlist: allowlist,
