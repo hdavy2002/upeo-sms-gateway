@@ -35,6 +35,22 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
+      - name: Configure release signing
+        if: inputs.build_type == 'release'
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
+        run: |
+          test -n "$KEYSTORE_B64" || { echo "Missing release keystore secret"; exit 1; }
+          echo "$KEYSTORE_B64" | base64 --decode > android/upload-keystore.jks
+          {
+            echo "storePassword=$STORE_PASSWORD"
+            echo "keyPassword=$KEY_PASSWORD"
+            echo "keyAlias=$KEY_ALIAS"
+            echo "storeFile=$GITHUB_WORKSPACE/android/upload-keystore.jks"
+          } > android/key.properties
       - name: Build debug APK
         if: inputs.build_type == 'debug' && (inputs.artifact == 'apk' || inputs.artifact == 'both')
         run: flutter build apk --debug
