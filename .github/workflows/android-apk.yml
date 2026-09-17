@@ -25,16 +25,29 @@ permissions:
   contents: read
 
 jobs:
+  verify:
+    uses: ./.github/workflows/verify.yml
   apk:
+    needs: verify
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
       - uses: subosito/flutter-action@v2
         with:
+          flutter-version: '3.47.2'
           channel: stable
           cache: true
-      - run: flutter pub get
+      - name: Use the dependency resolution verified in this run
+        uses: actions/download-artifact@v4
+        with:
+          name: companion-dependency-lock-${{ github.sha }}
+          path: .
+      - run: flutter pub get --enforce-lockfile
       - name: Configure release signing
         if: inputs.build_type == 'release'
         env:
@@ -43,7 +56,7 @@ jobs:
           KEY_PASSWORD: ${{ secrets.ANDROID_UPLOAD_KEY_PASSWORD }}
           KEY_ALIAS: ${{ secrets.ANDROID_UPLOAD_KEY_ALIAS }}
         run: |
-          test -n "$KEYSTORE_B64" || { echo "Missing release keystore secret"; exit 1; }
+          test -n "$KEYSTORE_B64" && test -n "$STORE_PASSWORD" && test -n "$KEY_PASSWORD" && test -n "$KEY_ALIAS" || { echo "Missing release signing secret"; exit 1; }
           echo "$KEYSTORE_B64" | base64 --decode > android/upload-keystore.jks
           {
             echo "storePassword=$STORE_PASSWORD"
@@ -53,13 +66,13 @@ jobs:
           } > android/key.properties
       - name: Build debug APK
         if: inputs.build_type == 'debug' && (inputs.artifact == 'apk' || inputs.artifact == 'both')
-        run: flutter build apk --debug
+        run: flutter build apk --debug --dart-define=RELEASE_SHA=${{ github.sha }}
       - name: Build release APK
         if: inputs.build_type == 'release' && (inputs.artifact == 'apk' || inputs.artifact == 'both')
-        run: flutter build apk --release
+        run: flutter build apk --release --dart-define=RELEASE_SHA=${{ github.sha }}
       - name: Build release App Bundle
         if: inputs.build_type == 'release' && (inputs.artifact == 'aab' || inputs.artifact == 'both')
-        run: flutter build appbundle --release
+        run: flutter build appbundle --release --dart-define=RELEASE_SHA=${{ github.sha }}
       - name: Upload APK
         if: inputs.artifact == 'apk' || inputs.artifact == 'both'
         uses: actions/upload-artifact@v4

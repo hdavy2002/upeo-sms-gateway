@@ -52,6 +52,16 @@ class SyncService {
       return null;
     }
 
+    final record = _record(sender, body, pduTimestampMillis, simSlot, subscriptionId);
+    final id = await repo.insert(record);
+    if (id != null) {
+      AppLog.i(_tag, 'Captured allowlisted SMS from "$sender" (id=$id)');
+    }
+    return id;
+  }
+
+  SmsRecord _record(String sender, String body, int pduTimestampMillis,
+      int simSlot, int subscriptionId) {
     final receivedAt = TimeUtils.iso8601Eat(
       pduTimestampMillis > 0
           ? pduTimestampMillis
@@ -62,7 +72,7 @@ class SyncService {
       message: body,
       receivedAt: receivedAt,
     );
-    final record = SmsRecord(
+    return SmsRecord(
       sender: sender,
       message: body,
       receivedAt: receivedAt,
@@ -77,19 +87,22 @@ class SyncService {
       createdAt: DateTime.now().millisecondsSinceEpoch,
       syncedAt: null,
     );
-    final id = await repo.insert(record);
-    if (id != null) {
-      AppLog.i(_tag, 'Captured allowlisted SMS from "$sender" (id=$id)');
-    }
-    return id;
+  }
+
+  SmsRecord? recordFromInbox(Map<String, dynamic> m) {
+    final sender = (m['sender'] ?? '').toString();
+    final body = (m['body'] ?? '').toString();
+    if (!config.paymentSmsAllowed(sender, body)) return null;
+    final date = (m['date'] as num?)?.toInt();
+    if (date == null || date <= 0) throw StateError('Invalid inbox timestamp');
+    return _record(sender, body, date, -1, (m['subId'] as num?)?.toInt() ?? -1);
   }
 
   /// Ingest messages read from the device SMS inbox (the backfill path).
   ///
-  /// Each entry is `{sender, body, dateMillis, subId}`. Unlike the live path we
-  /// dedup on exact sender+body (not just the message_hash) so a message the
-  /// receiver already captured is never re-inserted even if the inbox timestamp
-  /// differs from the original PDU timestamp. Returns the number newly stored.
+  /// Compatibility ingestion uses exact signed-message hash dedup. Distinct
+  /// timestamps must not collapse distinct transfers with identical wording.
+  /// Foreground backfill uses RepositoryInboxStore for atomic page checkpoints.
   Future<int> ingestInboxBatch(List<Map<String, dynamic>> messages) async {
     var added = 0;
     for (final m in messages) {
@@ -98,7 +111,7 @@ class SyncService {
       if (sender.isEmpty || body.isEmpty) continue;
       if (!config.paymentSmsAllowed(sender, body)) continue;
       // Already captured by the live path or an earlier scan?
-      if (await repo.existsByContent(sender, body)) continue;
+      // Hash dedup preserves distinct transfers with identical SMS text.
 
       final id = await captureIncoming(
         sender: sender,
@@ -135,18 +148,19 @@ class SyncService {
       final res = await api.sendIncoming(r);
       switch (res.outcome) {
         case SendOutcome.success:
-          await repo.markSynced(r.id!);
+          await repo.markAcknowledged(r.id!, res);
           sent++;
-          AppLog.i(_tag, 'Synced id=${r.id} (${res.detail})');
+          AppLog.i(_tag, 'Acknowledged id=${r.id}: ${res.receiptState}/${res.matchState}');
           break;
         case SendOutcome.transient:
         case SendOutcome.permanent:
           final nextRetry = r.retryCount + 1;
           final delay = _backoff(nextRetry);
           final nextAt = DateTime.now().add(delay).millisecondsSinceEpoch;
-          await repo.markFailed(r.id!, nextRetry, nextAt, res.detail);
+          await repo.markFailed(r.id!, nextRetry, nextAt, res.detail,
+            permanent: res.outcome == SendOutcome.permanent);
           failed++;
-          final permanent = nextRetry >= K.maxRetries;
+          final permanent = res.outcome == SendOutcome.permanent || nextRetry >= K.maxRetries;
           AppLog.w(
             _tag,
             'Send failed id=${r.id} retry=$nextRetry'
@@ -156,7 +170,7 @@ class SyncService {
       }
     }
     await repo.setMeta(
-      MetaKeys.lastSyncAt,
+      MetaKeys.lastSweepAt,
       '${DateTime.now().millisecondsSinceEpoch}',
     );
     return SweepResult(sent, failed, 0);

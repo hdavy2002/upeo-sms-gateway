@@ -1,0 +1,53 @@
+name: Companion verification
+on:
+  workflow_dispatch:
+    inputs:
+      resolve_lock:
+        description: Resolve and upload a dependency lock for review before release
+        type: boolean
+        default: false
+  workflow_call:
+    inputs:
+      resolve_lock:
+        type: boolean
+        default: false
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.2'
+          channel: stable
+          cache: true
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          # Match the tracked android/gradle/wrapper/gradle-wrapper.properties.
+          gradle-version: '9.1.0'
+      - name: Resolve dependency lock (explicit preparation only)
+        if: inputs.resolve_lock
+        run: flutter pub get
+      - name: Enforce committed dependency lock
+        if: ${{ !inputs.resolve_lock }}
+        run: flutter pub get --enforce-lockfile
+      - name: Record exact CI dependency resolution
+        uses: actions/upload-artifact@v4
+        with:
+          name: companion-dependency-lock-${{ github.sha }}
+          path: pubspec.lock
+          if-no-files-found: error
+      - name: Queue, migration, acknowledgement and paging tests
+        run: flutter test
+      - name: Configure native test host
+        run: printf 'flutter.sdk=%s\nsdk.dir=%s\n' "$FLUTTER_ROOT" "$ANDROID_HOME" > android/local.properties
+      - name: Native inbox provider regression tests
+        working-directory: android
+        run: gradle :app:testDebugUnitTest

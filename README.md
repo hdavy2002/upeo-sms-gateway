@@ -121,3 +121,57 @@ source inspection alone. Parent review must also confirm matching endpoint paths
 
 The bundled `backend_sample/` is upstream reference material only; it is not the
 AvaTOK Worker implementation and must not be deployed as part of this companion.
+
+
+## Receipt evidence and recovery (protocol v2)
+
+The dashboard distinguishes transport **Acknowledged**, parsed **Accepted**, and
+server **Confirmed** matching. Accepted `awaiting_reference` shows “Bank evidence
+stored; reference required.” Ignored, unmatched, awaiting-reference, review-pending,
+and legacy unknown responses never mean a confirmed payment. These are the last
+acknowledged outcomes, not a live query of a later browser claim; retry an unresolved row to
+refresh its outcome. Failed/configuration requests remain visible. Permanent
+HTTP/configuration failures stop automatic retries immediately. Manual retry
+starts a new retry budget while retaining lifetime attempts and audit history.
+
+The encrypted database upgrades additively from schema 1 to 2. Existing queue
+bodies, hashes and retry state remain intact; old acknowledgements have unknown
+receipt/matching outcomes. Never erase or re-key the database to recover a failed
+upgrade. Automatic and manual evidence deletion are disabled pending an approved
+retention policy. Unresolved receipts must not lose their only evidence.
+
+Inbox recovery uses ascending `(date, _id)` pages and a frozen upper timestamp.
+Each page and cursor commit together under an expiring database lease. Each sweep
+reads at most five pages of 200 messages, resuming the same window next time. A
+provider/permission error or lost lease cannot advance the cursor. First v2
+startup rescans the preceding two days because the old watermark could have
+skipped messages; an existing v2 watermark is never moved forward merely because
+the device was offline for more than two days. Subsequent scans overlap ten
+minutes and exact signed-message hashes and transactional reference-bearing content checks
+deduplicate native/live delivery with differing provider/PDU timestamps. Reference-less
+SMS timestamps remain distinct uncertain evidence; server bank-identity uniqueness is the
+payment deduplication authority. Older-than-initial-window legacy SMS require an
+explicit operator recovery procedure; they are not silently declared scanned.
+
+The About screen displays the CI-injected source revision. The heartbeat contract
+is unchanged. Original `received_at` (+03:00, whole seconds) and signed canonical
+fields are retained byte-for-byte on retries; only nonce and sent_at are rebuilt.
+
+Both workflows pin Flutter 3.47.2 (official tag verified at
+`d3b14c876900e553bc736ca19295fc09e3853e8e`). CI must resolve this repository's Dart
+^3.12.2 dependencies before the toolchain is considered validated. Verification is manual or reusable by the manual APK workflow. It
+runs Flutter tests (SQLite adapter migration/page/retry tests included) and native
+Robolectric provider tests before any build/signing step. No push trigger was
+added. SQLCipher encryption/key retention and device background behavior still
+require the separately authorized real-device upgrade smoke check; desktop
+SQLite tests exercise schema and transaction behavior, not Android encryption.
+
+The native verification job installs Gradle 9.1.0, matching the tracked wrapper
+properties, instead of relying on an untracked `android/gradlew` launcher. CI
+uploads `companion-dependency-lock-<revision>` containing `pubspec.lock`. Only an
+explicit manual `resolve_lock=true` verification may resolve a new lock; integrate
+that artifact after the authorized successful run. All ordinary verification and
+release jobs enforce the committed lock, so an unresolved draft cannot release.
+The dependent APK/AAB job downloads that exact lock and uses
+`flutter pub get --enforce-lockfile`, so artifact construction cannot silently
+select a different dependency resolution from the verified one.

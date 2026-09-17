@@ -244,7 +244,7 @@ class _ConfigFormState extends ConsumerState<ConfigForm> {
                 controller: _retentionCtrl,
                 decoration: const InputDecoration(
                   labelText: 'Retention window (days)',
-                  helperText: 'Synced messages are auto-purged after this many days.',
+                  helperText: 'Saved preference only. Evidence deletion is paused pending policy approval.',
                   helperMaxLines: 2,
                   border: OutlineInputBorder(),
                 ),

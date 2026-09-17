@@ -67,6 +67,7 @@ class _AboutScreenState extends ConsumerState<AboutScreen> {
           ),
           _card('App', [
             _kv('Version', _version),
+            _kv('Source revision', K.releaseSha),
             _kv('Package', K.applicationId),
           ]),
           _card('Device', [

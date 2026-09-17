@@ -26,7 +26,12 @@ class SmsRecord {
   final int nextAttemptAt;
   final String messageHash;
   final int createdAt; // epoch millis
-  final int? syncedAt; // epoch millis
+  final int? syncedAt; // legacy transport timestamp
+  final String receiptState, matchState;
+  final String? receiptId, reasonCode;
+  final int? acknowledgedAt, serverTime;
+  final int lifetimeAttempts, manualRetries;
+  final bool permanentFailure;
 
   const SmsRecord({
     this.id,
@@ -43,6 +48,10 @@ class SmsRecord {
     required this.messageHash,
     required this.createdAt,
     required this.syncedAt,
+    this.receiptState = 'unknown', this.matchState = 'unknown',
+    this.receiptId, this.reasonCode, this.acknowledgedAt, this.serverTime,
+    this.lifetimeAttempts = 0, this.manualRetries = 0,
+    this.permanentFailure = false,
   });
 
   Map<String, Object?> toMap() => {
@@ -60,6 +69,11 @@ class SmsRecord {
         'message_hash': messageHash,
         'created_at': createdAt,
         'synced_at': syncedAt,
+        'receipt_state': receiptState, 'match_state': matchState,
+        'receipt_id': receiptId, 'reason_code': reasonCode,
+        'acknowledged_at': acknowledgedAt, 'server_time': serverTime,
+        'lifetime_attempts': lifetimeAttempts, 'manual_retries': manualRetries,
+        'permanent_failure': permanentFailure ? 1 : 0,
       };
 
   factory SmsRecord.fromMap(Map<String, Object?> m) => SmsRecord(
@@ -77,7 +91,28 @@ class SmsRecord {
         messageHash: m['message_hash'] as String,
         createdAt: (m['created_at'] as int?) ?? 0,
         syncedAt: m['synced_at'] as int?,
+        receiptState: m['receipt_state'] as String? ?? 'unknown',
+        matchState: m['match_state'] as String? ?? 'unknown',
+        receiptId: m['receipt_id'] as String?, reasonCode: m['reason_code'] as String?,
+        acknowledgedAt: m['acknowledged_at'] as int?, serverTime: m['server_time'] as int?,
+        lifetimeAttempts: m['lifetime_attempts'] as int? ?? 0,
+        manualRetries: m['manual_retries'] as int? ?? 0,
+        permanentFailure: m['permanent_failure'] == 1,
       );
+
+  /// A snapshot from the last acknowledged send, never a live payment lookup.
+  String get acknowledgementLabel {
+    if (matchState == 'awaiting_reference' && receiptState == 'accepted') {
+      return 'Bank evidence stored; reference required';
+    }
+    if (matchState == 'confirmed' && receiptState == 'accepted') {
+      return 'Payment matched at last acknowledgement';
+    }
+    if (receiptState == 'accepted') return 'Bank evidence stored; unmatched';
+    if (receiptState == 'ignored') return 'Message ignored; no payment confirmation';
+    if (receiptState == 'review_pending') return 'Bank evidence needs review';
+    return 'Acknowledged; payment outcome unknown';
+  }
 
   DateTime get createdAtDate => DateTime.fromMillisecondsSinceEpoch(createdAt);
   DateTime? get syncedAtDate =>

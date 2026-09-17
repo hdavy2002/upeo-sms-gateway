@@ -63,7 +63,11 @@ class _LogTile extends ConsumerWidget {
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(record.maskedPreview),
+          if (record.acknowledgedAt != null || record.status == SmsStatus.synced)
+            Text(record.acknowledgementLabel),
+          Text('Last result: ${record.receiptState} · ${record.matchState}'),
+          if (record.reasonCode != null) Text(record.reasonCode!),
+          if (record.permanentFailure) const Text('Automatic retry paused; fix configuration then Retry now.'),
           Text(
             '${Fmt.ago(record.createdAtDate)} · SIM ${record.simSlot < 0 ? '?' : record.simSlot}'
             '${record.retryCount > 0 ? ' · retries ${record.retryCount}' : ''}',
@@ -75,7 +79,7 @@ class _LogTile extends ConsumerWidget {
         ],
       ),
       isThreeLine: true,
-      trailing: record.status == SmsStatus.failed
+      trailing: record.matchState != 'confirmed' && record.status != SmsStatus.pending
           ? IconButton(
               icon: const Icon(Icons.replay, color: Colors.orange),
               tooltip: 'Retry now',
@@ -95,7 +99,7 @@ class _LogTile extends ConsumerWidget {
         icon = Icons.schedule;
         break;
       case SmsStatus.synced:
-        c = Colors.green;
+        c = Colors.blueGrey;
         icon = Icons.cloud_done;
         break;
       case SmsStatus.failed:
@@ -116,12 +120,17 @@ class _LogTile extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              _kv('Status', r.status.name),
+              _kv('Transport', r.status == SmsStatus.synced ? 'Acknowledged' : r.status.name),
+              _kv('Receipt', r.receiptState), _kv('Match', r.matchState),
+              _kv('Reason', r.reasonCode ?? '—'),
+              _kv('Receipt ID', r.receiptId ?? '—'),
+              _kv('Lifetime attempts', '${r.lifetimeAttempts}'),
+              _kv('Manual retries', '${r.manualRetries}'),
               _kv('Received at', r.receivedAt),
               _kv('SIM slot', '${r.simSlot}'),
               _kv('Subscription', '${r.subscriptionId}'),
               _kv('Retries', '${r.retryCount}'),
-              _kv('Synced at', Fmt.dateTime(r.syncedAtDate)),
+              _kv('Last acknowledgement', Fmt.dateTime(r.acknowledgedAt == null ? null : DateTime.fromMillisecondsSinceEpoch(r.acknowledgedAt!))),
               _kv('Hash', r.messageHash),
               const Divider(),
               const Text('Message (raw):',

@@ -10,7 +10,7 @@ import '../data/sms_message.dart';
 
 /// Outcome of a single send attempt.
 enum SendOutcome {
-  /// 2xx accepted, or server reported it as a duplicate — treat as done.
+  /// Valid transport acknowledgement; receipt and match outcomes are separate.
   success,
 
   /// Transient (network/5xx/timeout) — keep in queue, back off, retry.
@@ -24,7 +24,52 @@ enum SendOutcome {
 class SendResult {
   final SendOutcome outcome;
   final String detail;
-  const SendResult(this.outcome, this.detail);
+  final String receiptState, matchState;
+  final String? receiptId, reasonCode;
+  final int? serverTime;
+  const SendResult(this.outcome, this.detail, {
+    this.receiptState = 'unknown', this.matchState = 'unknown',
+    this.receiptId, this.reasonCode, this.serverTime,
+  });
+
+  /// Legacy acknowledgements never imply receipt acceptance or payment success.
+  static SendResult acknowledgement(dynamic data) {
+    if (data is! Map) {
+      return const SendResult(SendOutcome.transient, 'invalid acknowledgement');
+    }
+    if (data['protocol_version'] == 2) {
+      const receiptStates = {'accepted', 'ignored', 'review_pending'};
+      const matchStates = {'unmatched', 'awaiting_reference', 'confirmed'};
+      final receipt = data['receipt_state'];
+      final match = data['match_state'];
+      final time = data['server_time'];
+      final id = data['receipt_id'];
+      if (data['ok'] != true || !receiptStates.contains(receipt) ||
+          !matchStates.contains(match) ||
+          (time != null && (time is! int || time <= 0)) ||
+          (id != null && (id is! String || id.isEmpty)) ||
+          (receipt == 'accepted' && id == null) ||
+          (match != 'unmatched' && (receipt != 'accepted' || id == null))) {
+        return const SendResult(SendOutcome.transient, 'invalid v2 acknowledgement');
+      }
+      final reason = data['reason_code'];
+      return SendResult(SendOutcome.success, 'acknowledged',
+        receiptState: receipt as String, matchState: match as String,
+        receiptId: id as String?, serverTime: time as int?,
+        reasonCode: reason is String && RegExp(r'^[a-z0-9_:-]{1,80}$').hasMatch(reason)
+          ? reason : null);
+    }
+    if (data['protocol_version'] != null && data['protocol_version'] != 1) {
+      return const SendResult(SendOutcome.transient, 'unsupported acknowledgement protocol');
+    }
+    final status = data['status'] ?? data['result'];
+    if (data['ok'] == true || status == 'accepted' || status == 'duplicate' ||
+        status == 'review_pending' || status == 'confirmed') {
+      return const SendResult(SendOutcome.success, 'legacy acknowledgement; outcome unknown',
+        reasonCode: 'acknowledged_legacy');
+    }
+    return const SendResult(SendOutcome.transient, 'unrecognized acknowledgement');
+  }
 }
 
 /// Signs payloads and talks to the backend over HTTPS. The [AppConfig.secretKey]
@@ -96,12 +141,11 @@ class ApiClient {
       final res = await _dio.post(K.incomingPath, data: payload);
       final code = res.statusCode ?? 0;
       if (code >= 200 && code < 300) {
-        final dup = _looksDuplicate(res.data);
-        return SendResult(SendOutcome.success, dup ? 'duplicate' : 'accepted');
+        return SendResult.acknowledgement(res.data);
       }
       if (code == 409 && _looksDuplicate(res.data)) {
         // A replay/config conflict must not silently acknowledge a queued SMS.
-        return const SendResult(SendOutcome.success, 'duplicate');
+        return SendResult.acknowledgement(res.data);
       }
       if (code == 408 || code == 429) {
         return SendResult(SendOutcome.transient, 'HTTP $code');

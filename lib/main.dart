@@ -63,18 +63,13 @@ void backgroundMain() async {
 
   // Let the runner read the device SMS inbox (native, via the service engine)
   // so it can backfill any allowlisted SMS the live receiver never delivered.
-  runner.inboxReader = (sinceMillis, limit) async {
-    final res = await channel.invokeMethod(
-      'readInbox',
-      {'sinceMillis': sinceMillis, 'limit': limit},
-    );
-    if (res is List) {
-      return res
-          .map((e) => (e as Map).map((k, v) => MapEntry(k.toString(), v)))
-          .cast<Map<String, dynamic>>()
-          .toList();
-    }
-    return <Map<String, dynamic>>[];
+  runner.inboxReader = (afterDate, afterId, upperDate, limit) async {
+    final res = await channel.invokeMethod<List>('readInbox', {
+      'afterDate': afterDate, 'afterId': afterId,
+      'upperDate': upperDate, 'limit': limit,
+    });
+    if (res == null) throw StateError('SMS provider returned no page');
+    return res.map((e) => Map<String, dynamic>.from(e as Map)).toList();
   };
 
   channel.setMethodCallHandler((call) async {

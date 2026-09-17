@@ -47,9 +47,16 @@ class MainActivity : FlutterActivity() {
                     "getSimInfo" -> result.success(SimInfo.activeSubscriptions(this))
 
                     "readInbox" -> {
-                        val since = (call.argument<Number>("sinceMillis"))?.toLong() ?: 0L
-                        val limit = (call.argument<Number>("limit"))?.toInt() ?: 200
-                        result.success(SmsInbox.read(this, since, limit))
+                        try {
+                            val afterDate = call.argument<Number>("afterDate")?.toLong() ?: 0L
+                            val afterId = call.argument<Number>("afterId")?.toLong() ?: -1L
+                            val upperDate = call.argument<Number>("upperDate")?.toLong()
+                                ?: throw IllegalArgumentException("upperDate required")
+                            val limit = call.argument<Number>("limit")?.toInt() ?: 200
+                            result.success(SmsInbox.read(this, afterDate, afterId, upperDate, limit))
+                        } catch (e: Exception) {
+                            result.error("inbox_read_failed", "SMS inbox unavailable; cursor retained", null)
+                        }
                     }
 
                     else -> result.notImplemented()

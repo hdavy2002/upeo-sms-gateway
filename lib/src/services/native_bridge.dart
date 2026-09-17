@@ -68,17 +68,15 @@ class NativeBridge {
     return (m ?? {}).map((k, v) => MapEntry(k.toString(), v));
   }
 
-  /// Read the device SMS inbox (UI isolate; backed by MainActivity). Returns
-  /// `{sender, body, date, subId}` maps for messages newer than [sinceMillis].
-  Future<List<Map<String, dynamic>>> readInbox(int sinceMillis, int limit) async {
-    final list = await _invoke<List>('readInbox', {
-      'sinceMillis': sinceMillis,
-      'limit': limit,
+  /// Errors propagate: an inaccessible provider is not an empty inbox.
+  Future<List<Map<String, dynamic>>> readInbox(
+      int afterDate, int afterId, int upperDate, int limit) async {
+    final list = await _ch.invokeMethod<List>('readInbox', {
+      'afterDate': afterDate, 'afterId': afterId,
+      'upperDate': upperDate, 'limit': limit,
     });
-    if (list == null) return [];
-    return list
-        .map((e) => (e as Map).map((k, v) => MapEntry(k.toString(), v)))
-        .toList();
+    if (list == null) throw StateError('SMS provider returned no page');
+    return list.map((e) => Map<String, dynamic>.from(e as Map)).toList();
   }
 
   Future<List<Map<String, dynamic>>> simInfo() async {

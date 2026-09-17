@@ -57,6 +57,8 @@ android {
         }
     }
 
+    testOptions { unitTests.isIncludeAndroidResources = true }
+
     buildTypes {
         release {
             signingConfig = if (hasReleaseKeystore) {
@@ -83,6 +85,8 @@ flutter {
 }
 
 dependencies {
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.robolectric:robolectric:4.14.1")
     // Explicit (also pulled transitively by the Flutter embedding) — used by the
     // foreground service / receivers for NotificationCompat + ContextCompat.
     implementation("androidx.core:core-ktx:1.13.1")

@@ -36,6 +36,8 @@ void main() {
     expect(first['message_hash'], record.messageHash);
     expect(retry['message_hash'], first['message_hash']);
     expect(first['received_at'], record.receivedAt);
+    expect(first['received_at'], '2026-09-17T12:30:00+03:00');
+    expect(retry['sent_at'], matches(RegExp(r'^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\+03:00$')));
     expect(first['message'], record.message);
     expect(first['signature'], Canonical.sign(
       stringToSign: [record.deviceId, record.sender, record.message,
@@ -123,6 +125,52 @@ void main() {
       expect(result.outcome, SendOutcome.permanent);
       expect(result.detail, isNot(contains('sensitive')));
       expect((await api.sendHeartbeat({})).outcome, SendOutcome.permanent);
+    }
+  });
+  test('v2 receipt and match outcomes stay separate from delivery', () async {
+    final adapter = RecordingAdapter();
+    final api = ApiClient(stagingConfig, adapter: adapter);
+    for (final state in ['accepted', 'ignored', 'review_pending']) {
+      adapter.response = {'ok': true, 'protocol_version': 2,
+        'receipt_state': state, 'match_state': 'unmatched',
+        'receipt_id': 'synthetic-id', 'reason_code': 'awaiting_claim', 'server_time': 123};
+      final result = await api.sendIncoming(paymentRecord());
+      expect(result.outcome, SendOutcome.success);
+      expect(result.receiptState, state); expect(result.matchState, 'unmatched');
+    }
+    adapter.response = {'ok': true, 'status': 'confirmed'};
+    final legacy = await api.sendIncoming(paymentRecord());
+    expect(legacy.outcome, SendOutcome.success);
+    expect(legacy.matchState, 'unknown');
+    adapter.response = {'ok': true, 'protocol_version': 2,
+      'receipt_state': 'ignored', 'match_state': 'confirmed', 'server_time': 123};
+    expect((await api.sendIncoming(paymentRecord())).outcome, SendOutcome.transient);
+  });
+
+  test('awaiting reference accepts evidence without claiming a payment', () {
+    final result = SendResult.acknowledgement({'ok': true, 'protocol_version': 2,
+      'receipt_id': 'synthetic-id', 'receipt_state': 'accepted',
+      'match_state': 'awaiting_reference', 'reason_code': 'reference_required'});
+    expect(result.outcome, SendOutcome.success);
+    expect(result.matchState, 'awaiting_reference');
+    expect(result.serverTime, isNull);
+    final confirmed = SendResult.acknowledgement({'ok': true, 'protocol_version': 2,
+      'receipt_id': 'synthetic-id', 'receipt_state': 'accepted',
+      'match_state': 'confirmed', 'reason_code': 'matched'});
+    expect(confirmed.matchState, 'confirmed');
+  });
+
+  test('malformed and inconsistent v2 responses remain retryable', () {
+    final base = {'ok': true, 'protocol_version': 2, 'receipt_id': 'synthetic-id',
+      'receipt_state': 'accepted', 'match_state': 'unmatched'};
+    for (final data in [null, 'ok', <String, dynamic>{},
+      {...base, 'match_state': 'claimed'}, {...base, 'receipt_id': null},
+      {...base, 'server_time': '123'}, {...base, 'ok': false},
+      {...base, 'protocol_version': 3},
+      {...base, 'receipt_state': 'ignored', 'match_state': 'awaiting_reference'},
+      {...base, 'receipt_state': 'review_pending', 'match_state': 'confirmed'},
+    ]) {
+      expect(SendResult.acknowledgement(data).outcome, SendOutcome.transient);
     }
   });
 }

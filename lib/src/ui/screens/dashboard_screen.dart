@@ -141,13 +141,20 @@ class _CountsRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = d.counts;
-    return Row(
-      children: [
+    return Column(children: [
+      Row(children: [
         _Stat(label: 'Pending', value: c.pending, color: Colors.blue),
-        _Stat(label: 'Synced', value: c.synced, color: Colors.green),
+        _Stat(label: 'Acknowledged', value: c.synced, color: Colors.blueGrey),
         _Stat(label: 'Failed', value: c.failed, color: Colors.red),
-      ],
-    );
+      ]),
+      Row(children: [
+        _Stat(label: 'Accepted', value: c.accepted, color: Colors.teal),
+        _Stat(label: 'Confirmed', value: c.confirmed, color: Colors.green),
+        _Stat(label: 'Unresolved', value: c.review, color: Colors.orange),
+      ]),
+      const Text('Last acknowledged results only. Accepted evidence may still require a reference. Later browser claims are not refreshed here.',
+        style: TextStyle(fontSize: 12)),
+    ]);
   }
 }
 
@@ -187,7 +194,7 @@ class _InfoCard extends StatelessWidget {
           children: [
             _row('Last SMS received',
                 last == null ? '—' : '${last.sender} · ${Fmt.ago(last.createdAtDate)}'),
-            _row('Last sync', Fmt.ago(d.lastSyncAt)),
+            _row('Last acknowledgement', Fmt.ago(d.lastSyncAt)),
             _row('Last heartbeat',
                 '${Fmt.ago(d.lastHeartbeatAt)} ${d.lastHeartbeatAt == null ? '' : (d.lastHeartbeatOk ? '✓' : '✗')}'),
             _row('Connectivity', d.connectivity),

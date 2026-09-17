@@ -1,4 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
+
+import '../core/constants.dart';
+import '../data/sms_repository.dart';
+import '../services/inbox_backfill.dart';
 
 import '../services/api_client.dart';
 import 'dashboard_controller.dart';
@@ -24,6 +29,16 @@ class GatewayActions {
   /// Manual "Sync now".
   Future<SweepSummary> syncNow() async {
     final sync = await ref.read(uiSyncServiceProvider.future);
+    if (sync.config.isComplete) {
+      await InboxBackfill(
+        store: RepositoryInboxStore(sync.repo, sync.recordFromInbox),
+        reader: ref.read(nativeBridgeProvider).readInbox,
+        owner: const Uuid().v4(), now: () => DateTime.now().millisecondsSinceEpoch,
+        pageSize: K.inboxScanLimit,
+        initialLookbackMs: K.inboxInitialLookback.inMilliseconds,
+        overlapMs: K.inboxScanOverlap.inMilliseconds,
+      ).drain();
+    }
     final res = await sync.sweep();
     ref.invalidate(dashboardControllerProvider);
     ref.invalidate(logsControllerProvider);

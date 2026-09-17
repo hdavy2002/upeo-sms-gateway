@@ -20,6 +20,9 @@ import '../core/app_log.dart';
 class AppDatabase {
   AppDatabase._(this._db, this._path, this._key);
 
+  /// Inject an in-memory SQLite adapter in CI; production always opens SQLCipher.
+  factory AppDatabase.forTesting(Database db) => AppDatabase._(db, '', '');
+
   Database _db;
   final String _path;
   final String _key;
@@ -32,7 +35,7 @@ class AppDatabase {
 
   static const String table = 'messages';
   static const String metaTable = 'meta';
-  static const int _version = 1;
+  static const int _version = 2;
   static const String _tag = 'AppDatabase';
   static const Duration _openTimeout = Duration(seconds: 12);
   static const Duration _keyTimeout = Duration(seconds: 8);
@@ -86,6 +89,9 @@ class AppDatabase {
         await d.rawQuery('PRAGMA busy_timeout = 5000');
       },
       onCreate: _onCreate,
+      onUpgrade: (d, oldVersion, newVersion) async {
+        if (oldVersion < 2) await migrateV2(d);
+      },
     ).timeout(
       _openTimeout,
       onTimeout: () => throw TimeoutException('Opening the database timed out'),
@@ -128,6 +134,28 @@ class AppDatabase {
         value TEXT
       )
     ''');
+    await migrateV2(d);
+  }
+
+  /// Additive migration: no queue deletion, re-key, or status reinterpretation.
+  /// Exposed for CI database-adapter migration regression tests.
+  static Future<void> migrateV2(DatabaseExecutor d) async {
+    for (final column in [
+      "receipt_state TEXT NOT NULL DEFAULT 'unknown'",
+      "match_state TEXT NOT NULL DEFAULT 'unknown'",
+      'receipt_id TEXT', 'reason_code TEXT', 'acknowledged_at INTEGER',
+      'server_time INTEGER', 'lifetime_attempts INTEGER NOT NULL DEFAULT 0',
+      'manual_retries INTEGER NOT NULL DEFAULT 0',
+      'permanent_failure INTEGER NOT NULL DEFAULT 0',
+    ]) {
+      await d.execute('ALTER TABLE $table ADD COLUMN $column');
+    }
+    await d.execute('UPDATE $table SET lifetime_attempts=retry_count');
+    await d.execute("UPDATE $table SET acknowledged_at=synced_at, reason_code='acknowledged_legacy', lifetime_attempts=retry_count+1 WHERE status='synced'");
+    await d.execute("CREATE TABLE retry_history (id INTEGER PRIMARY KEY AUTOINCREMENT, message_id INTEGER NOT NULL, attempted_at INTEGER NOT NULL, outcome TEXT NOT NULL, detail TEXT, retry_count INTEGER NOT NULL)");
+    await d.execute("CREATE TABLE inbox_lease (id INTEGER PRIMARY KEY CHECK(id=1), owner TEXT NOT NULL, expires_at INTEGER NOT NULL)");
+    // Old lastInboxScanAt may have skipped a backlog. Start one bounded rescan
+    // instead of trusting it; unfinished v2 windows never slide forward.
   }
 
   /// Closing the shared single-instance handle tears it down for EVERY isolate

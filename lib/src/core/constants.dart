@@ -3,6 +3,7 @@ class K {
   K._();
 
   static const String appName = 'AvaTOK SMS Gateway · Production';
+  static const String releaseSha = String.fromEnvironment('RELEASE_SHA', defaultValue: 'unversioned');
   static const String applicationId = 'ai.avatok.sms_companion.test';
   // Exact production origin. No runtime HTTP/host override.
   static const String productionBaseUrl = 'https://api.avatok.ai';
@@ -40,11 +41,11 @@ class K {
   //       a message that arrived while the DB was briefly closed or the service
   //       was dead). Scans content://sms/inbox and ingests anything missing. -----
   static const Duration inboxScanInterval = Duration(seconds: 60);
-  // Furthest back a scan ever looks. Bounded well under the retention window so a
-  // synced-then-purged message can never be resurrected and re-sent.
+  // Initial v2 recovery window only. Persisted unfinished scans never advance
+  // past old unseen messages; destructive retention is disabled.
   static const Duration inboxInitialLookback = Duration(days: 2);
   // Re-scan a little before the high-water mark to tolerate clock skew between
-  // the PDU timestamp and the inbox `date`; content dedup makes overlap safe.
+  // the PDU timestamp and the inbox `date`; transactional dedup makes overlap safe.
   static const Duration inboxScanOverlap = Duration(minutes: 10);
   static const int inboxScanLimit = 200;
 

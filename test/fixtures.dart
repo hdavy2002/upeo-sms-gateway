@@ -14,7 +14,7 @@ const stagingConfig = AppConfig(
   allowInsecureHttp: false,
 );
 
-const paymentBody = 'HDFC Bank: Rs. 100.00 credited to A/c XX1234. Ref 999999.';
+const paymentBody = 'HDFC Bank: Rs. 1.00 credited to A/c XX1234. (UPI 001234567890).';
 
 SmsRecord paymentRecord({String? deviceId, String body = paymentBody}) {
   const sender = 'AD-HDFCBK';

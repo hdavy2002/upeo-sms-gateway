@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:math';
+import 'package:uuid/uuid.dart';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 
@@ -9,6 +9,7 @@ import '../core/constants.dart';
 import '../data/database.dart';
 import '../data/sms_repository.dart';
 import 'sync_service.dart';
+import 'inbox_backfill.dart';
 
 /// Boots the data + sync stack inside a background isolate (the one hosted by
 /// the Kotlin foreground service, and the one WorkManager spawns).
@@ -31,8 +32,7 @@ class BackgroundRunner {
   /// Reads the device SMS inbox via the native channel. Injected by
   /// `backgroundMain` (the foreground-service isolate). Null in isolates with no
   /// native host (e.g. WorkManager), where the inbox backfill simply no-ops.
-  Future<List<Map<String, dynamic>>> Function(int sinceMillis, int limit)?
-      inboxReader;
+  InboxReader? inboxReader;
 
   static const _tag = 'BgRunner';
 
@@ -112,10 +112,9 @@ class BackgroundRunner {
     }
   }
 
-  /// Scan the device SMS inbox and ingest anything the live path missed. Only
-  /// looks at messages newer than the last scan (with a small overlap), bounded
-  /// to [K.inboxInitialLookback] so a synced-then-purged message is never
-  /// resurrected. Newly-stored messages are swept immediately.
+  /// Drain up to five ascending pages, preserving a frozen window across
+  /// invocations. Only the first scan uses the initial lookback; an unfinished
+  /// old window is never skipped merely because the device was offline.
   Future<void> _safeBackfill(String reason) async {
     final reader = inboxReader;
     if (reader == null) return; // no native channel in this isolate
@@ -124,40 +123,14 @@ class BackgroundRunner {
       final cfg = await _configRepo.load();
       if (!cfg.isComplete) return;
 
-      final now = DateTime.now().millisecondsSinceEpoch;
-      final floor = now - K.inboxInitialLookback.inMilliseconds;
-      final last = int.tryParse(await repo.getMeta(MetaKeys.lastInboxScanAt) ?? '') ?? 0;
-      final since = last > 0
-          ? max(last - K.inboxScanOverlap.inMilliseconds, floor)
-          : floor;
-
-      final raw = await reader(since, K.inboxScanLimit);
-      if (raw.isEmpty) return;
-
-      var maxDate = last;
-      final batch = <Map<String, dynamic>>[];
-      for (final m in raw) {
-        final date = (m['date'] as num?)?.toInt() ?? 0;
-        if (date > maxDate) maxDate = date;
-        batch.add({
-          'sender': m['sender'],
-          'body': m['body'],
-          'dateMillis': date,
-          'subId': m['subId'],
-        });
-      }
-
       final sync = await _sync();
-      final added = await sync.ingestInboxBatch(batch);
-      // Advance the high-water mark only to messages we actually scanned, so we
-      // never skip past one we haven't seen.
-      if (maxDate > last) {
-        await repo.setMeta(MetaKeys.lastInboxScanAt, '$maxDate');
-      }
-      if (added > 0) {
-        AppLog.i(_tag, 'Inbox backfill($reason): +$added missed SMS — sweeping');
-        await sync.sweep();
-      }
+      final store = RepositoryInboxStore(repo, sync.recordFromInbox);
+      await InboxBackfill(store: store, reader: reader,
+        owner: const Uuid().v4(), now: () => DateTime.now().millisecondsSinceEpoch,
+        pageSize: K.inboxScanLimit,
+        initialLookbackMs: K.inboxInitialLookback.inMilliseconds,
+        overlapMs: K.inboxScanOverlap.inMilliseconds).drain();
+      await sync.sweep();
     } catch (e) {
       AppLog.e(_tag, 'backfill($reason) error: $e');
     }

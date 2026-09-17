@@ -37,8 +37,8 @@ class SettingsScreen extends ConsumerWidget {
           ),
           ListTile(
             leading: const Icon(Icons.cleaning_services),
-            title: const Text('Clear synced messages'),
-            subtitle: const Text('Delete all messages already confirmed by the backend.'),
+            title: const Text('Evidence retention protected'),
+            subtitle: const Text('Automatic and manual deletion are disabled until a retention policy is approved.'),
             onTap: () => _clearSynced(context, ref),
           ),
           ListTile(
@@ -65,7 +65,7 @@ class SettingsScreen extends ConsumerWidget {
     ref.invalidate(logsControllerProvider);
     if (context.mounted) {
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Deleted $n synced messages')));
+          .showSnackBar(SnackBar(content: Text('Cleanup disabled: payment evidence retained ($n removed)')));
     }
   }
 
