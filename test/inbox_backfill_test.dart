@@ -40,7 +40,13 @@ void main() {
     await runner().drain();
     expect(store.ids.length, 400); expect(store.completed, isNull);
     await runner().drain();
-    expect(store.ids.length, 501); expect(store.completed, 1000); expect(store.checkpoint, isNull);
+    expect(store.ids.length, 501);
+    expect(store.completed, isNull);
+    expect(store.checkpoint!.afterId, 500);
+    expect(store.checkpoint!.upperDate, 1000);
+    await runner().drain(); // Only an empty page proves the window is complete.
+    expect(store.ids.length, 501);
+    expect(store.completed, 1000); expect(store.checkpoint, isNull);
     await runner().drain(); // overlap is deduplicated by persistence
     expect(store.ids.length, 501);
   });
