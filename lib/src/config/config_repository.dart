@@ -22,9 +22,23 @@ class ConfigRepository {
   static const _kRetention = 'cfg_retention_days';
   static const _kAllowHttp = 'cfg_allow_http';
   static const _kDbKey = 'db_encryption_key';
+  static const _kSnapshot = 'avatok_staging_config_v1';
 
   Future<AppConfig> load() async {
     final all = await _storage.readAll();
+    final snapshot = all[_kSnapshot];
+    if (snapshot != null) {
+      final data = jsonDecode(snapshot) as Map<String, dynamic>;
+      return AppConfig(
+        apiBaseUrl: data['base_url'] as String,
+        deviceId: data['device_id'] as String,
+        secretKey: data['secret'] as String,
+        allowlist: (data['allowlist'] as List).cast<String>(),
+        accountSuffix: data['account_suffix'] as String,
+        retentionDays: data['retention_days'] as int,
+        allowInsecureHttp: false,
+      );
+    }
     final allowlistRaw = all[_kAllowlist];
     List<String> allowlist;
     if (allowlistRaw == null || allowlistRaw.isEmpty) {
@@ -33,7 +47,7 @@ class ConfigRepository {
       allowlist = (jsonDecode(allowlistRaw) as List).cast<String>();
     }
     return AppConfig(
-      apiBaseUrl: all[_kBaseUrl] ?? '',
+      apiBaseUrl: all[_kBaseUrl] ?? K.stagingBaseUrl,
       deviceId: all[_kDeviceId] ?? '',
       secretKey: all[_kSecret] ?? '',
       allowlist: allowlist,
@@ -43,12 +57,18 @@ class ConfigRepository {
   }
 
   Future<void> save(AppConfig cfg) async {
-    await _storage.write(key: _kBaseUrl, value: cfg.apiBaseUrl.trim());
-    await _storage.write(key: _kDeviceId, value: cfg.deviceId.trim());
-    await _storage.write(key: _kSecret, value: cfg.secretKey);
-    await _storage.write(key: _kAllowlist, value: jsonEncode(cfg.allowlist));
-    await _storage.write(key: _kRetention, value: '${cfg.retentionDays}');
-    await _storage.write(key: _kAllowHttp, value: '${cfg.allowInsecureHttp}');
+    final error = cfg.validationError;
+    if (error != null) throw ArgumentError(error);
+    // A single encrypted value prevents background isolates observing a new
+    // device ID with an old secret during a multi-key configuration save.
+    await _storage.write(key: _kSnapshot, value: jsonEncode({
+      'base_url': cfg.apiBaseUrl,
+      'device_id': cfg.deviceId,
+      'secret': cfg.secretKey,
+      'allowlist': cfg.allowlist,
+      'account_suffix': cfg.accountSuffix,
+      'retention_days': cfg.retentionDays,
+    }));
   }
 
   /// Returns the DB encryption key, generating a 256-bit random one on first use.

@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -14,8 +13,8 @@ import '../core/app_log.dart';
 /// serialises writes and we set a busy timeout to ride out brief contention.
 ///
 /// Hardened open: the open is time-boxed so a wedged native call surfaces an
-/// error instead of hanging the UI forever, and a corrupt/locked DB file is
-/// wiped and recreated once so the app self-heals. WAL journalling is NOT used
+/// error instead of hanging the UI forever. Failed opens NEVER erase queued
+/// payments: leave the encrypted files intact for recovery. WAL journalling is NOT used
 /// — `journal_mode=WAL` was observed to wedge `openDatabase` on some OEM storage
 /// (OnePlus/OxygenOS); the default rollback journal is reliable here.
 class AppDatabase {
@@ -49,16 +48,7 @@ class AppDatabase {
     final dir = await getApplicationDocumentsDirectory();
     final path = p.join(dir.path, 'upeo_gateway.db');
 
-    try {
-      return AppDatabase._(await _open(path, key), path, key);
-    } catch (e) {
-      // The DB may be locked, half-created, or corrupt (a crash mid-write, or a
-      // stale WAL file from an older build). Wipe the files and recreate once so
-      // the app recovers instead of hanging/erroring on every launch.
-      AppLog.w(_tag, 'open failed ($e) — recreating database');
-      await _deleteDbFiles(path);
-      return AppDatabase._(await _open(path, key), path, key);
-    }
+    return AppDatabase._(await _open(path, key), path, key);
   }
 
   /// Re-establish the connection after a `database_closed`. sqflite shares ONE
@@ -100,17 +90,6 @@ class AppDatabase {
       _openTimeout,
       onTimeout: () => throw TimeoutException('Opening the database timed out'),
     );
-  }
-
-  static Future<void> _deleteDbFiles(String path) async {
-    for (final suffix in ['', '-wal', '-shm', '-journal']) {
-      try {
-        final f = File('$path$suffix');
-        if (await f.exists()) await f.delete();
-      } catch (_) {
-        // best-effort
-      }
-    }
   }
 
   static Future<void> _onCreate(Database d, int version) async {

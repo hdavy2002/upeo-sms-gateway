@@ -2,12 +2,10 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../config/app_config.dart';
 import '../../services/api_client.dart';
-import '../../state/gateway_actions.dart';
 import '../../state/providers.dart';
 
 /// Reusable editor for the gateway configuration, used by both Setup and
@@ -31,10 +29,10 @@ class _ConfigFormState extends ConsumerState<ConfigForm> {
   final _deviceCtrl = TextEditingController();
   final _secretCtrl = TextEditingController();
   final _allowlistCtrl = TextEditingController();
+  final _accountCtrl = TextEditingController();
   final _retentionCtrl = TextEditingController();
 
   bool _secretVisible = false;
-  bool _allowHttp = false;
   bool _loaded = false;
   bool _busy = false;
 
@@ -44,6 +42,7 @@ class _ConfigFormState extends ConsumerState<ConfigForm> {
     _deviceCtrl.dispose();
     _secretCtrl.dispose();
     _allowlistCtrl.dispose();
+    _accountCtrl.dispose();
     _retentionCtrl.dispose();
     super.dispose();
   }
@@ -55,8 +54,8 @@ class _ConfigFormState extends ConsumerState<ConfigForm> {
     _deviceCtrl.text = cfg.deviceId;
     _secretCtrl.text = cfg.secretKey;
     _allowlistCtrl.text = cfg.allowlist.join(', ');
+    _accountCtrl.text = cfg.accountSuffix;
     _retentionCtrl.text = '${cfg.retentionDays}';
-    _allowHttp = cfg.allowInsecureHttp;
   }
 
   AppConfig _collect() {
@@ -69,9 +68,10 @@ class _ConfigFormState extends ConsumerState<ConfigForm> {
       apiBaseUrl: _urlCtrl.text.trim(),
       deviceId: _deviceCtrl.text.trim(),
       secretKey: _secretCtrl.text,
-      allowlist: allowlist.isEmpty ? const ['MPESA'] : allowlist,
+      allowlist: allowlist,
+      accountSuffix: _accountCtrl.text.trim(),
       retentionDays: int.tryParse(_retentionCtrl.text.trim()) ?? 14,
-      allowInsecureHttp: _allowHttp,
+      allowInsecureHttp: false,
     );
   }
 
@@ -84,6 +84,8 @@ class _ConfigFormState extends ConsumerState<ConfigForm> {
         _snack('Configuration saved');
         widget.onSaved?.call();
       }
+    } catch (_) {
+      if (mounted) _snack('Could not save configuration. Please try again.', error: true);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -93,15 +95,17 @@ class _ConfigFormState extends ConsumerState<ConfigForm> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _busy = true);
     try {
-      // Persist first so the heartbeat uses the latest values.
-      await ref.read(configControllerProvider.notifier).save(_collect());
-      final res = await ref.read(gatewayActionsProvider).testConnection();
+      // Test only the values on screen. Do not save/start SMS forwarding as a
+      // side effect of the operator testing credentials.
+      final res = await ApiClient(_collect()).sendHeartbeat({'test': true});
       if (!mounted) return;
       final ok = res.outcome == SendOutcome.success;
       _snack(
-        ok ? 'Connection OK — heartbeat accepted' : 'Test failed: ${res.detail}',
+        ok ? 'Staging heartbeat accepted — no SMS sent' : 'Test failed: ${res.detail}',
         error: !ok,
       );
+    } catch (_) {
+      if (mounted) _snack('Heartbeat failed. Please try again.', error: true);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -111,13 +115,12 @@ class _ConfigFormState extends ConsumerState<ConfigForm> {
   /// backend for this Device ID (see the help text / README).
   void _generateSecret() {
     final rng = Random.secure();
-    final bytes = List<int>.generate(24, (_) => rng.nextInt(256));
+    final bytes = List<int>.generate(32, (_) => rng.nextInt(256));
     setState(() {
       _secretCtrl.text = base64Url.encode(bytes);
-      _secretVisible = true;
+      _secretVisible = false;
     });
-    Clipboard.setData(ClipboardData(text: _secretCtrl.text));
-    _snack('Secret generated and copied — register it on the backend');
+    _snack('Secret generated — register the same value for this staging device');
   }
 
   void _snack(String msg, {bool error = false}) {
@@ -146,49 +149,46 @@ class _ConfigFormState extends ConsumerState<ConfigForm> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              const Text(
+                'Staging only · HDFC payment SMS · Sideload companion',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 12),
               TextFormField(
                 controller: _urlCtrl,
                 decoration: const InputDecoration(
-                  labelText: 'API base URL',
-                  hintText: 'https://gateway.example.com',
-                  helperText: 'Your backend root (FastAPI/ERPNext). HTTPS required.',
+                  labelText: 'AvaTOK staging Worker base URL',
+                  hintText: 'https://api-staging.avatok.ai',
+                  helperText: 'Only the AvaTOK staging HTTPS origin is accepted.',
                   helperMaxLines: 2,
                   border: OutlineInputBorder(),
                 ),
                 keyboardType: TextInputType.url,
-                validator: (v) {
-                  final s = (v ?? '').trim();
-                  if (s.isEmpty) return 'Required';
-                  final uri = Uri.tryParse(s);
-                  if (uri == null || !uri.hasScheme) return 'Enter a full URL';
-                  if (!s.toLowerCase().startsWith('https://') && !_allowHttp) {
-                    return 'HTTPS required (or enable debug HTTP below)';
-                  }
-                  return null;
-                },
+                validator: (v) => AppConfig.validateBaseUrl((v ?? '').trim()),
               ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _deviceCtrl,
                 decoration: const InputDecoration(
                   labelText: 'Device ID',
-                  hintText: 'PHONE_001',
+                  hintText: 'AVATOK_HDFC_STAGING_01',
                   helperText:
-                      'A unique name YOU choose for this phone (e.g. PHONE_001, '
-                      'SHOP_NRB_01). Must match the device record on the backend.',
+                      'Must match this phone’s registered AvaTOK staging device ID.',
                   helperMaxLines: 3,
                   border: OutlineInputBorder(),
                 ),
-                validator: (v) => (v ?? '').trim().isEmpty ? 'Required' : null,
+                validator: (v) => AppConfig.validateDeviceId((v ?? '').trim()),
               ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _secretCtrl,
                 obscureText: !_secretVisible,
+                autocorrect: false,
+                enableSuggestions: false,
                 decoration: InputDecoration(
                   labelText: 'Device secret key (HMAC)',
                   helperText:
-                      'A shared secret YOU generate, registered on the backend '
+                      'A shared secret you generate, registered in staging '
                       'for this Device ID. Tap the key icon to generate one.',
                   helperMaxLines: 3,
                   border: const OutlineInputBorder(),
@@ -198,7 +198,7 @@ class _ConfigFormState extends ConsumerState<ConfigForm> {
                       IconButton(
                         tooltip: 'Generate strong secret',
                         icon: const Icon(Icons.key),
-                        onPressed: _generateSecret,
+                        onPressed: _busy ? null : _generateSecret,
                       ),
                       IconButton(
                         tooltip: _secretVisible ? 'Hide' : 'Show',
@@ -211,19 +211,33 @@ class _ConfigFormState extends ConsumerState<ConfigForm> {
                     ],
                   ),
                 ),
-                validator: (v) => (v ?? '').isEmpty ? 'Required' : null,
+                validator: (v) => AppConfig.validateSecret(v ?? ''),
               ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _allowlistCtrl,
                 decoration: const InputDecoration(
-                  labelText: 'Sender allowlist (comma-separated)',
+                  labelText: 'HDFC sender allowlist (comma-separated)',
                   helperText:
-                      'Only SMS whose sender matches one of these is stored/forwarded. '
-                      'Default: MPESA',
+                      'Exact bank headers, e.g. HDFCBK, HDFCBN. '
+                      'DLT routing prefixes such as AD- are supported.',
                   helperMaxLines: 3,
                   border: OutlineInputBorder(),
                 ),
+                validator: (v) => AppConfig.validateAllowlist(
+                    (v ?? '').split(',').map((s) => s.trim()).toList()),
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _accountCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'HDFC account suffix (last 4 digits)',
+                  helperText: 'Only credit/received alerts naming this account are queued. OTPs are ignored.',
+                  helperMaxLines: 3,
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.number,
+                validator: (v) => AppConfig.validateAccountSuffix((v ?? '').trim()),
               ),
               const SizedBox(height: 12),
               TextFormField(
@@ -235,15 +249,11 @@ class _ConfigFormState extends ConsumerState<ConfigForm> {
                   border: OutlineInputBorder(),
                 ),
                 keyboardType: TextInputType.number,
-              ),
-              const SizedBox(height: 8),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Allow insecure HTTP (debug only)'),
-                subtitle: const Text(
-                    'Leave OFF in production. HTTPS protects SMS PII in transit.'),
-                value: _allowHttp,
-                onChanged: (v) => setState(() => _allowHttp = v),
+                validator: (v) {
+                  final days = int.tryParse((v ?? '').trim());
+                  return days != null && days >= 3 && days <= 90
+                      ? null : 'Choose 3–90 days';
+                },
               ),
               const SizedBox(height: 16),
               Row(
@@ -260,7 +270,7 @@ class _ConfigFormState extends ConsumerState<ConfigForm> {
                     child: OutlinedButton.icon(
                       onPressed: _busy ? null : _testConnection,
                       icon: const Icon(Icons.wifi_tethering),
-                      label: const Text('Test Connection'),
+                      label: const Text('Test heartbeat'),
                     ),
                   ),
                 ],

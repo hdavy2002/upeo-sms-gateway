@@ -63,11 +63,11 @@ class _AboutScreenState extends ConsumerState<AboutScreen> {
             leading: Icon(Icons.sms, size: 40),
             title: Text(K.appName,
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            subtitle: Text('Offline-first SMS gateway · sideload only'),
+            subtitle: Text('HDFC payment SMS · staging · sideload only'),
           ),
           _card('App', [
             _kv('Version', _version),
-            _kv('Package', 'com.upeo.upeo_sms_gateway'),
+            _kv('Package', K.applicationId),
           ]),
           _card('Device', [
             _kv('Manufacturer', '${_device['manufacturer'] ?? ''}'),
@@ -91,10 +91,11 @@ class _AboutScreenState extends ConsumerState<AboutScreen> {
             child: Padding(
               padding: EdgeInsets.all(16),
               child: Text(
-                'Privacy: only SMS matching the sender allowlist are stored '
+                'Privacy: only HDFC payment alerts matching the sender allowlist '
+                'and configured account suffix are stored '
                 '(encrypted at rest) and forwarded over HTTPS with an HMAC '
                 'signature. Non-allowlisted messages are never stored or sent. '
-                'See the README for the Kenya DPA posture.',
+                'Destination: AvaTOK staging only. Based on Upeo SMS Gateway.',
                 style: TextStyle(fontSize: 12),
               ),
             ),

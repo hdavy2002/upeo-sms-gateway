@@ -2,7 +2,11 @@
 class K {
   K._();
 
-  static const String appName = 'UPEO SMS Gateway';
+  static const String appName = 'AvaTOK SMS Gateway · Staging';
+  static const String applicationId = 'ai.avatok.sms_companion.staging';
+  // Exact origin, verified against the main app's staging configuration.
+  // No production fallback and no runtime HTTP/host override.
+  static const String stagingBaseUrl = 'https://api-staging.avatok.ai';
 
   // ----- MethodChannels (must match the Kotlin side) -----
   static const String nativeChannel = 'upeo/native';
@@ -14,7 +18,7 @@ class K {
   static const String versionPath = '/api/app/version';
 
   // ----- Defaults -----
-  static const List<String> defaultAllowlist = ['MPESA'];
+  static const List<String> defaultAllowlist = ['HDFCBK', 'HDFCBN'];
   static const int defaultRetentionDays = 14;
 
   // ----- Sync / retry policy -----

@@ -46,9 +46,9 @@ class SyncService {
     required int simSlot,
     required int subscriptionId,
   }) async {
-    if (!config.senderAllowed(sender)) {
-      // Privacy: non-allowlisted messages are never stored or transmitted.
-      AppLog.d(_tag, 'Dropped non-allowlisted SMS from "$sender"');
+    if (!config.paymentSmsAllowed(sender, body)) {
+      // Privacy: reject before persistence and do not log sender/body.
+      AppLog.d(_tag, 'Dropped SMS outside the configured HDFC payment filter');
       return null;
     }
 
@@ -96,7 +96,7 @@ class SyncService {
       final sender = (m['sender'] ?? '').toString();
       final body = (m['body'] ?? '').toString();
       if (sender.isEmpty || body.isEmpty) continue;
-      if (!config.senderAllowed(sender)) continue;
+      if (!config.paymentSmsAllowed(sender, body)) continue;
       // Already captured by the live path or an earlier scan?
       if (await repo.existsByContent(sender, body)) continue;
 

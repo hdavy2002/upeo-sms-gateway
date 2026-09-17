@@ -7,10 +7,10 @@ class AppConfig {
   final String deviceId;
   final String secretKey;
   final List<String> allowlist;
+  final String accountSuffix;
   final int retentionDays;
 
-  /// When true, plain-HTTP base URLs are permitted (DEV ONLY). HTTPS is enforced
-  /// otherwise.
+  /// Legacy field retained for source compatibility. True is always rejected.
   final bool allowInsecureHttp;
 
   const AppConfig({
@@ -18,12 +18,13 @@ class AppConfig {
     required this.deviceId,
     required this.secretKey,
     required this.allowlist,
+    this.accountSuffix = '',
     required this.retentionDays,
     required this.allowInsecureHttp,
   });
 
   static const AppConfig empty = AppConfig(
-    apiBaseUrl: '',
+    apiBaseUrl: K.stagingBaseUrl,
     deviceId: '',
     secretKey: '',
     allowlist: K.defaultAllowlist,
@@ -31,24 +32,74 @@ class AppConfig {
     allowInsecureHttp: false,
   );
 
-  /// Minimum config needed to attempt sync.
-  bool get isComplete =>
-      apiBaseUrl.isNotEmpty && deviceId.isNotEmpty && secretKey.isNotEmpty;
+  bool get isComplete => validationError == null;
 
-  bool get isHttps => apiBaseUrl.toLowerCase().startsWith('https://');
+  bool get isHttps => Uri.tryParse(apiBaseUrl)?.scheme == 'https';
 
-  /// Whether the message from [sender] passes the allowlist. Case-insensitive;
-  /// an allowlist entry matches if it is contained in the sender (so `MPESA`
-  /// matches `MPESA`, `M-PESA`, and shortcodes that embed it).
-  bool senderAllowed(String sender) {
-    if (allowlist.isEmpty) return false;
-    final s = sender.toUpperCase().replaceAll('-', '').replaceAll(' ', '');
-    for (final raw in allowlist) {
-      final token = raw.trim().toUpperCase().replaceAll('-', '').replaceAll(' ', '');
-      if (token.isEmpty) continue;
-      if (s.contains(token)) return true;
+  static String? validateBaseUrl(String value) {
+    final uri = Uri.tryParse(value);
+    final expected = Uri.parse(K.stagingBaseUrl);
+    if (uri == null || uri.scheme != 'https' ||
+        uri.host != expected.host || uri.port != 443 ||
+        uri.userInfo.isNotEmpty || uri.hasQuery || uri.hasFragment ||
+        (uri.path.isNotEmpty && uri.path != '/')) {
+      return 'Use the AvaTOK staging Worker root: ${K.stagingBaseUrl}';
     }
-    return false;
+    return null;
+  }
+
+  static String? validateDeviceId(String value) =>
+      RegExp(r'^[A-Za-z0-9_-]{1,64}$').hasMatch(value)
+          ? null : 'Use 1–64 letters, digits, underscores or hyphens';
+
+  static String? validateSecret(String value) =>
+      value.length >= 32 && value.length <= 256 &&
+              !RegExp(r'\s').hasMatch(value)
+          ? null : 'Enter a 32–256 character device secret without whitespace';
+
+  static String? validateAccountSuffix(String value) =>
+      RegExp(r'^[0-9]{4}$').hasMatch(value)
+          ? null : 'Enter the last 4 account digits';
+
+  // Exact bank header after an optional Indian DLT routing prefix/category.
+  // Substring matching would accept e.g. NOTHDFCBK or HDFCBKSCAM.
+  static String? _bankHeader(String value) => RegExp(
+        r'^(?:[A-Z]{2}-)?(HDFC[A-Z0-9]{2,6})(?:-[SPTG])?$',
+      ).firstMatch(value.trim().toUpperCase())?.group(1);
+
+  static String? validateAllowlist(List<String> values) =>
+      values.isNotEmpty && values.every((v) => _bankHeader(v) != null)
+          ? null : 'Enter exact HDFC sender headers, separated by commas';
+
+  String? get validationError => validateBaseUrl(apiBaseUrl) ??
+      (allowInsecureHttp ? 'HTTP is disabled in this staging companion' : null) ??
+      validateDeviceId(deviceId) ?? validateSecret(secretKey) ??
+      validateAllowlist(allowlist) ?? validateAccountSuffix(accountSuffix) ??
+      (retentionDays < 3 || retentionDays > 90
+          ? 'Retention must be between 3 and 90 days' : null);
+
+  /// Case-insensitive exact HDFC header match; no wildcard/substring matches.
+  bool senderAllowed(String sender) {
+    final header = _bankHeader(sender);
+    return header != null && allowlist.any((v) => _bankHeader(v) == header);
+  }
+
+  /// Conservative capture filter, NOT payment validation. The Worker must parse
+  /// and reconcile the signed raw SMS independently before granting any credit.
+  bool paymentSmsAllowed(String sender, String body) {
+    if (!isComplete || !senderAllowed(sender) || body.length > 8192) return false;
+    if (RegExp(r'\b(?:otp|one[ -]?time|password|pin|verification|debited)\b',
+            caseSensitive: false).hasMatch(body)) return false;
+    if (!RegExp(r'\b(?:credited|received)\b', caseSensitive: false).hasMatch(body) ||
+        !RegExp(r'(?:\bINR\b|\bRs\.?|₹)\s*[0-9]',
+            caseSensitive: false).hasMatch(body)) return false;
+    final accounts = RegExp(
+      r'\b(?:a\s*/\s*c|acct|account|ac)\b\s*(?:(?:no\.?|number)\s*)?[:.\-]?\s*([xX*0-9]+)(?![A-Za-z0-9])',
+      caseSensitive: false,
+    ).allMatches(body);
+    // Match the suffix only within an account-labelled token, never an amount,
+    // phone number, reference/UTR, or the middle of a longer account number.
+    return accounts.any((m) => m.group(1)!.endsWith(accountSuffix));
   }
 
   AppConfig copyWith({
@@ -56,6 +107,7 @@ class AppConfig {
     String? deviceId,
     String? secretKey,
     List<String>? allowlist,
+    String? accountSuffix,
     int? retentionDays,
     bool? allowInsecureHttp,
   }) {
@@ -64,6 +116,7 @@ class AppConfig {
       deviceId: deviceId ?? this.deviceId,
       secretKey: secretKey ?? this.secretKey,
       allowlist: allowlist ?? this.allowlist,
+      accountSuffix: accountSuffix ?? this.accountSuffix,
       retentionDays: retentionDays ?? this.retentionDays,
       allowInsecureHttp: allowInsecureHttp ?? this.allowInsecureHttp,
     );

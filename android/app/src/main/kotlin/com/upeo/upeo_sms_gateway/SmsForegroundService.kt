@@ -231,8 +231,8 @@ class SmsForegroundService : Service() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("UPEO SMS Gateway")
-            .setContentText(text ?: "Gateway running — forwarding allowlisted SMS")
+            .setContentTitle("AvaTOK SMS · Staging")
+            .setContentText(text ?: "Gateway running — HDFC payment alerts to staging")
             .setSmallIcon(android.R.drawable.stat_notify_sync)
             .setOngoing(true)
             .setOnlyAlertOnce(true)

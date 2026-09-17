@@ -35,7 +35,7 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Set up UPEO SMS Gateway')),
+      appBar: AppBar(title: const Text('Set up AvaTOK SMS · Staging')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -50,11 +50,12 @@ class _SetupScreenState extends ConsumerState<SetupScreen> {
                       style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                   SizedBox(height: 8),
                   Text(
-                    'This device becomes a dedicated SMS gateway. Only messages '
-                    'whose sender matches your allowlist (default: MPESA) are '
-                    'stored — encrypted on this phone — and forwarded to your '
-                    'backend over HTTPS. All other SMS (personal messages, OTPs) '
-                    'are ignored and never stored or transmitted.',
+                    'This device becomes a dedicated HDFC payment-SMS gateway. '
+                    'Only credit/received alerts from your HDFC sender allowlist '
+                    'naming your configured account suffix are stored in the '
+                    'encrypted queue and forwarded to AvaTOK staging over HTTPS. '
+                    'OTP and unrelated SMS are ignored. The Worker independently '
+                    'validates payments; this phone does not grant wallet credit.',
                   ),
                 ],
               ),
