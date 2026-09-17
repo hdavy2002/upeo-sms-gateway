@@ -11,6 +11,15 @@ on:
         options:
           - debug
           - release
+      artifact:
+        description: Artifact to build
+        required: true
+        default: apk
+        type: choice
+        options:
+          - apk
+          - aab
+          - both
 
 permissions:
   contents: read
@@ -27,14 +36,25 @@ jobs:
           cache: true
       - run: flutter pub get
       - name: Build debug APK
-        if: inputs.build_type == 'debug'
+        if: inputs.build_type == 'debug' && (inputs.artifact == 'apk' || inputs.artifact == 'both')
         run: flutter build apk --debug
       - name: Build release APK
-        if: inputs.build_type == 'release'
+        if: inputs.build_type == 'release' && (inputs.artifact == 'apk' || inputs.artifact == 'both')
         run: flutter build apk --release
+      - name: Build release App Bundle
+        if: inputs.build_type == 'release' && (inputs.artifact == 'aab' || inputs.artifact == 'both')
+        run: flutter build appbundle --release
       - name: Upload APK
+        if: inputs.artifact == 'apk' || inputs.artifact == 'both'
         uses: actions/upload-artifact@v4
         with:
           name: avatok-sms-companion-${{ inputs.build_type }}
           path: build/app/outputs/flutter-apk/*.apk
+          if-no-files-found: error
+      - name: Upload AAB
+        if: inputs.build_type == 'release' && (inputs.artifact == 'aab' || inputs.artifact == 'both')
+        uses: actions/upload-artifact@v4
+        with:
+          name: avatok-sms-companion-aab
+          path: build/app/outputs/bundle/release/*.aab
           if-no-files-found: error
