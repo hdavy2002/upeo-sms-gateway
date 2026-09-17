@@ -1,0 +1,40 @@
+name: Companion Android APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: APK type
+        required: true
+        default: debug
+        type: choice
+        options:
+          - debug
+          - release
+
+permissions:
+  contents: read
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - name: Build debug APK
+        if: inputs.build_type == 'debug'
+        run: flutter build apk --debug
+      - name: Build release APK
+        if: inputs.build_type == 'release'
+        run: flutter build apk --release
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: avatok-sms-companion-${{ inputs.build_type }}
+          path: build/app/outputs/flutter-apk/*.apk
+          if-no-files-found: error
