@@ -2,8 +2,12 @@
 
     <!-- ===================== Permissions ===================== -->
     <!-- SMS capture -->
-    <uses-permission android:name="android.permission.RECEIVE_SMS" />
-    <uses-permission android:name="android.permission.READ_SMS" />
+    <!-- [TAKEDOWN-HDFC-DARK-1 2026-09-20] SMS permissions withdrawn with the rail.
+         The receiver already returns early on CompanionRail.disabled; these are
+         removed as well because Play polices SMS permissions heavily. Restore
+         both lines if the rail is ever turned back on. -->
+    <!-- <uses-permission android:name="android.permission.RECEIVE_SMS" /> -->
+    <!-- <uses-permission android:name="android.permission.READ_SMS" /> -->
 
     <!-- Networking -->
     <uses-permission android:name="android.permission.INTERNET" />
