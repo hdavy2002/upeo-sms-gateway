@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants.dart';
 import '../state/providers.dart';
 import 'home_shell.dart';
+import 'screens/disabled_screen.dart';
 import 'screens/setup_screen.dart';
 
 class UpeoApp extends ConsumerWidget {
@@ -11,6 +12,19 @@ class UpeoApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // [TAKEDOWN-HDFC-DARK-1 2026-09-20] Short-circuit before touching config at
+    // all: no setup/dashboard screen, no chance to tap "start service".
+    if (K.railDisabled) {
+      return MaterialApp(
+        title: K.appName,
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData(
+          colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1565C0)),
+          useMaterial3: true,
+        ),
+        home: const DisabledScreen(),
+      );
+    }
     final cfg = ref.watch(configControllerProvider);
     return MaterialApp(
       title: K.appName,

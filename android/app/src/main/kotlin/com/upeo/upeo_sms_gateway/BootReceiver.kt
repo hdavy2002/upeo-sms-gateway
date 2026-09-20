@@ -13,6 +13,11 @@ import androidx.core.content.ContextCompat
 class BootReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
+        // [TAKEDOWN-HDFC-DARK-1 2026-09-20] Disabled: never auto-start the gateway.
+        if (CompanionRail.disabled) {
+            Log.i(TAG, "railDisabled — not starting gateway service on boot/update")
+            return
+        }
         when (intent.action) {
             Intent.ACTION_BOOT_COMPLETED,
             "android.intent.action.QUICKBOOT_POWERON",

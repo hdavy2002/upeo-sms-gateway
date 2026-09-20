@@ -55,4 +55,13 @@ class K {
 
   // ----- Watchdog: service considered "stale" if no tick within this window -----
   static const Duration watchdogStaleAfter = Duration(minutes: 3);
+
+  // ----- Kill switch -----
+  // [TAKEDOWN-HDFC-DARK-1 2026-09-20] This companion is the private counterpart to
+  // the internal ₹1 HDFC UPI SMS smoke harness (worker `hdfcSmsRailEnabled` flag),
+  // never the commercial rail. While true: the app never starts the gateway
+  // service, never reads or forwards SMS, and shows a plain disabled notice
+  // instead of the dashboard. Reversible — flip back to false to restore.
+  // Mirrored natively by `CompanionRail.disabled` in android/.../CompanionRail.kt.
+  static const bool railDisabled = true;
 }

@@ -31,6 +31,12 @@ class _BootstrapState extends State<_Bootstrap> {
   }
 
   Future<void> _startup() async {
+    // [TAKEDOWN-HDFC-DARK-1 2026-09-20] Disabled: never schedule the backstop
+    // or start the gateway service. See K.railDisabled.
+    if (K.railDisabled) {
+      AppLog.i('Bootstrap', 'railDisabled — skipping service/backstop startup');
+      return;
+    }
     // Schedule the ~15-minute periodic backstop sweep.
     await const WorkmanagerBackstop().initAndSchedule();
     // Ensure the gateway service is running (also recovers after a force-stop,
@@ -57,6 +63,15 @@ class _BootstrapState extends State<_Bootstrap> {
 void backgroundMain() async {
   WidgetsFlutterBinding.ensureInitialized();
   AppLog.i('backgroundMain', 'Background isolate starting');
+
+  // [TAKEDOWN-HDFC-DARK-1 2026-09-20] Disabled: the background isolate must not
+  // read, persist or forward any SMS. Return before wiring up the channel that
+  // would otherwise receive 'onSmsReceived'/'onSweep' calls from the native
+  // service. See K.railDisabled.
+  if (K.railDisabled) {
+    AppLog.i('backgroundMain', 'railDisabled — background isolate is a no-op');
+    return;
+  }
 
   const channel = MethodChannel(K.smsEventsChannel);
   final runner = BackgroundRunner();

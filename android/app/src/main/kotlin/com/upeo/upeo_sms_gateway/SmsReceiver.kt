@@ -23,6 +23,11 @@ class SmsReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != Telephony.Sms.Intents.SMS_RECEIVED_ACTION) return
+        // [TAKEDOWN-HDFC-DARK-1 2026-09-20] Disabled: never parse or forward SMS.
+        if (CompanionRail.disabled) {
+            Log.i(TAG, "railDisabled — ignoring SMS_RECEIVED")
+            return
+        }
 
         val sms = SmsParser.fromIntent(context, intent)
         if (sms == null) {
