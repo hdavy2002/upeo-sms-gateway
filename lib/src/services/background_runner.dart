@@ -8,6 +8,7 @@ import '../core/app_log.dart';
 import '../core/constants.dart';
 import '../data/database.dart';
 import '../data/sms_repository.dart';
+import 'native_bridge.dart';
 import 'sync_service.dart';
 import 'inbox_backfill.dart';
 
@@ -150,11 +151,29 @@ class BackgroundRunner {
   Future<bool> runBackstopOnce() async {
     try {
       AppLog.i(_tag, 'WorkManager backstop running');
+      await _ensureServiceRunning();
       await _safeSweep('backstop', purge: true);
       await _safeHeartbeat();
       return true;
     } finally {
       await dispose();
+    }
+  }
+
+  /// Best-effort restart of the foreground service from the WorkManager isolate.
+  /// That isolate has no MainActivity channel, so this only lands when a native
+  /// host is attached; the authoritative restart is the native
+  /// ServiceWatchdogReceiver alarm (see android/.../ServiceWatchdogReceiver.kt),
+  /// which fires on the same ~15 min cadence and restarts the service if dead.
+  Future<void> _ensureServiceRunning() async {
+    try {
+      final bridge = NativeBridge();
+      if (!await bridge.isServiceRunning()) {
+        AppLog.w(_tag, 'Backstop: service not running — requesting start');
+        await bridge.startService();
+      }
+    } catch (e) {
+      AppLog.w(_tag, 'Backstop: could not ensure service: $e');
     }
   }
 

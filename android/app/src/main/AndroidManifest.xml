@@ -2,12 +2,11 @@
 
     <!-- ===================== Permissions ===================== -->
     <!-- SMS capture -->
-    <!-- [TAKEDOWN-HDFC-DARK-1 2026-09-20] SMS permissions withdrawn with the rail.
-         The receiver already returns early on CompanionRail.disabled; these are
-         removed as well because Play polices SMS permissions heavily. Restore
-         both lines if the rail is ever turned back on. -->
-    <!-- <uses-permission android:name="android.permission.RECEIVE_SMS" /> -->
-    <!-- <uses-permission android:name="android.permission.READ_SMS" /> -->
+    <!-- [UPI3-REENABLE 2026-09-29] Restored with the rail. To take the app dark
+         again, set CompanionRail.disabled / K.railDisabled to true and comment
+         these two lines out (Play polices SMS permissions heavily). -->
+    <uses-permission android:name="android.permission.RECEIVE_SMS" />
+    <uses-permission android:name="android.permission.READ_SMS" />
 
     <!-- Networking -->
     <uses-permission android:name="android.permission.INTERNET" />
@@ -91,6 +90,12 @@
                 <action android:name="android.provider.Telephony.SMS_RECEIVED" />
             </intent-filter>
         </receiver>
+
+        <!-- Native ~15 min watchdog alarm: restarts the service if it was killed. -->
+        <receiver
+            android:name="com.upeo.upeo_sms_gateway.ServiceWatchdogReceiver"
+            android:enabled="true"
+            android:exported="false" />
 
         <!-- ===================== Boot / update receiver ===================== -->
         <!-- Restarts the gateway on reboot and after the app is updated. -->

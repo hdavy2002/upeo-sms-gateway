@@ -1,6 +1,7 @@
 import 'package:sqflite_sqlcipher/sqflite.dart';
 
 import '../core/app_log.dart';
+import '../core/constants.dart';
 import 'database.dart';
 import 'sms_message.dart';
 import '../services/api_client.dart';
@@ -81,14 +82,20 @@ class SmsRepository {
 
   /// Rows due for a send attempt: pending, or failed-and-not-exhausted whose
   /// backoff window has elapsed.
-  Future<List<SmsRecord>> dueForSend(int maxRetries, int limit) {
+  ///
+  /// Rows captured within [youngWindow] ignore the [maxRetries] cap: a fresh
+  /// payment SMS keeps retrying (with capped backoff) until it is acknowledged
+  /// or hits a genuinely permanent failure.
+  Future<List<SmsRecord>> dueForSend(int maxRetries, int limit,
+      {Duration youngWindow = K.paymentRetryWindow}) {
     return _guard(() async {
       final now = DateTime.now().millisecondsSinceEpoch;
+      final youngCutoff = now - youngWindow.inMilliseconds;
       final rows = await _db.query(
         AppDatabase.table,
         where:
-            "status = ? OR (status = ? AND retry_count < ? AND next_attempt_at <= ? AND permanent_failure=0)",
-        whereArgs: [SmsStatus.pending.value, SmsStatus.failed.value, maxRetries, now],
+            "status = ? OR (status = ? AND (retry_count < ? OR created_at > ?) AND next_attempt_at <= ? AND permanent_failure=0)",
+        whereArgs: [SmsStatus.pending.value, SmsStatus.failed.value, maxRetries, youngCutoff, now],
         orderBy: 'created_at ASC',
         limit: limit,
       );
@@ -135,8 +142,10 @@ class SmsRepository {
     });
   });
 
-  Future<QueueCounts> counts(int maxRetries) {
+  Future<QueueCounts> counts(int maxRetries,
+      {Duration youngWindow = K.paymentRetryWindow}) {
     return _guard(() async {
+      final youngCutoff = DateTime.now().millisecondsSinceEpoch - youngWindow.inMilliseconds;
       Future<int> count(String where, List<Object?> args) async {
         final r = await _db.rawQuery(
           'SELECT COUNT(*) c FROM ${AppDatabase.table} WHERE $where',
@@ -149,8 +158,8 @@ class SmsRepository {
       final synced = await count('status = ?', [SmsStatus.synced.value]);
       final failed = await count('status = ?', [SmsStatus.failed.value]);
       final permanent = await count(
-        'status = ? AND (retry_count >= ? OR permanent_failure=1)',
-        [SmsStatus.failed.value, maxRetries],
+        'status = ? AND ((retry_count >= ? AND created_at <= ?) OR permanent_failure=1)',
+        [SmsStatus.failed.value, maxRetries, youngCutoff],
       );
       return QueueCounts(pending, synced, failed, permanent,
         accepted: await count("receipt_state='accepted'", []),

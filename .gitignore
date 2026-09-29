@@ -46,3 +46,7 @@ app.*.map.json
 
 # Local production companion credential; never commit or upload.
 PROD_DEVICE_SECRET.txt
+
+# Build outputs must never be committed.
+*.apk
+*.aab

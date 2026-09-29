@@ -94,36 +94,64 @@ void main() {
     expect(adapter.requests, isEmpty);
   });
 
-  test('only explicit duplicate conflicts count as delivered', () async {
+  test('409 duplicate / already-stored acks count as delivered; other 409s retry', () async {
     final adapter = RecordingAdapter()..status = 409;
     final api = ApiClient(stagingConfig, adapter: adapter);
+    for (final response in [
+      {'status': 'duplicate'}, {'result': 'duplicate'},
+      {'status': 'already_stored'}, {'reason_code': 'already_stored'},
+      {'error': 'duplicate'},
+    ]) {
+      adapter.response = response;
+      final result = await api.sendIncoming(paymentRecord());
+      expect(result.outcome, SendOutcome.success, reason: '$response');
+    }
+    // A replay/unknown conflict is not an acknowledgement, but it heals on retry
+    // (each attempt signs a fresh nonce), so it must stay retryable.
     for (final response in [
       {'status': 'replay'}, {'status': 'not_duplicate'},
       {'detail': 'duplicate nonce'}, <String, dynamic>{},
     ]) {
       adapter.response = response;
-      expect((await api.sendIncoming(paymentRecord())).outcome, SendOutcome.permanent);
+      expect((await api.sendIncoming(paymentRecord())).outcome, SendOutcome.transient);
     }
-    adapter.response = {'status': 'duplicate'};
-    expect((await api.sendIncoming(paymentRecord())).outcome, SendOutcome.success);
-    adapter.response = {'result': 'duplicate'};
-    expect((await api.sendIncoming(paymentRecord())).outcome, SendOutcome.success);
   });
 
-  test('rate limits and server failures retry; redirects and auth failures stay failed', () async {
+  test('transient: 5xx, 408/429, 401/403 and 400 invalid_timestamp retry; malformed 4xx and redirects are permanent', () async {
+    final adapter = RecordingAdapter();
+    final api = ApiClient(stagingConfig, adapter: adapter);
+    for (final code in [401, 403, 408, 429, 500, 502, 503]) {
+      adapter.status = code;
+      expect((await api.sendIncoming(paymentRecord())).outcome, SendOutcome.transient,
+          reason: 'HTTP $code');
+    }
+    adapter.status = 400;
+    for (final body in [{'error': 'invalid_timestamp'}, {'reason_code': 'invalid_timestamp'}]) {
+      adapter.response = body;
+      expect((await api.sendIncoming(paymentRecord())).outcome, SendOutcome.transient);
+    }
+    for (final code in [400, 413, 422]) {
+      adapter.status = code;
+      adapter.response = {'detail': 'sensitive SMS echoed by a server'};
+      final result = await api.sendIncoming(paymentRecord());
+      expect(result.outcome, SendOutcome.permanent, reason: 'HTTP $code');
+      expect(result.detail, isNot(contains('sensitive')));
+    }
+    for (final code in [301, 302, 307, 308]) {
+      adapter.status = code;
+      expect((await api.sendIncoming(paymentRecord())).outcome, SendOutcome.permanent);
+    }
+  });
+
+  test('heartbeat: rate limits and server failures retry; redirects and 4xx stay failed', () async {
     final adapter = RecordingAdapter();
     final api = ApiClient(stagingConfig, adapter: adapter);
     for (final code in [408, 429, 500, 503]) {
       adapter.status = code;
-      expect((await api.sendIncoming(paymentRecord())).outcome, SendOutcome.transient);
       expect((await api.sendHeartbeat({})).outcome, SendOutcome.transient);
     }
     for (final code in [301, 302, 307, 308, 400, 401, 403]) {
       adapter.status = code;
-      adapter.response = {'detail': 'sensitive SMS echoed by a server'};
-      final result = await api.sendIncoming(paymentRecord());
-      expect(result.outcome, SendOutcome.permanent);
-      expect(result.detail, isNot(contains('sensitive')));
       expect((await api.sendHeartbeat({})).outcome, SendOutcome.permanent);
     }
   });

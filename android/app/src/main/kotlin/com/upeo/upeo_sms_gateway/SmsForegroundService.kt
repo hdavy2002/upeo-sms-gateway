@@ -64,6 +64,7 @@ class SmsForegroundService : Service() {
         startForegroundSafely()
         startBackgroundEngine()
         mainHandler.post(aliveTicker)
+        ServiceWatchdogReceiver.arm(this)
         Log.i(TAG, "Foreground service created")
     }
 
@@ -71,6 +72,7 @@ class SmsForegroundService : Service() {
         when (intent?.action) {
             ACTION_STOP -> {
                 Log.i(TAG, "Stop requested")
+                ServiceWatchdogReceiver.cancel(this)
                 stopForegroundCompat()
                 stopSelf()
                 return START_NOT_STICKY

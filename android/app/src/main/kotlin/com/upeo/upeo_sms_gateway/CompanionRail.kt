@@ -7,5 +7,5 @@ package com.upeo.upeo_sms_gateway
  * fires before the Dart engine has run. Flip back to false to restore behaviour.
  */
 object CompanionRail {
-    const val disabled = true
+    const val disabled = false
 }

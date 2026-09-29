@@ -160,7 +160,10 @@ class SyncService {
           await repo.markFailed(r.id!, nextRetry, nextAt, res.detail,
             permanent: res.outcome == SendOutcome.permanent);
           failed++;
-          final permanent = res.outcome == SendOutcome.permanent || nextRetry >= K.maxRetries;
+          final young = DateTime.now().millisecondsSinceEpoch - r.createdAt <
+              K.paymentRetryWindow.inMilliseconds;
+          final permanent = res.outcome == SendOutcome.permanent ||
+              (nextRetry >= K.maxRetries && !young);
           AppLog.w(
             _tag,
             'Send failed id=${r.id} retry=$nextRetry'

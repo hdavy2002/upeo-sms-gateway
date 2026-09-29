@@ -70,6 +70,25 @@ void main() {
     final history = await db.query('retry_history', orderBy: 'id');
     expect(history.map((r) => r['outcome']), ['permanent', 'manual_reset']);
   });
+  test('payment SMS younger than 48h never exhausts retries; old ones still do', () async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    // Old row (fixture created_at = 1): 8 transient failures exhaust it.
+    await repo.markFailed(1, 8, 0, 'HTTP 503');
+    expect(await repo.dueForSend(8, 10), isEmpty);
+    expect((await repo.counts(8)).permanentlyFailed, 1);
+    // Same row, but captured just now: keeps retrying far past the cap.
+    await db.update('messages', {'created_at': now});
+    await repo.markFailed(1, 200, 0, 'HTTP 503');
+    expect((await repo.dueForSend(8, 10)).single.retryCount, 200);
+    expect((await repo.counts(8)).permanentlyFailed, 0);
+    // A genuinely permanent failure still stops a young row.
+    await repo.markFailed(1, 201, 0, 'HTTP 400', permanent: true);
+    expect(await repo.dueForSend(8, 10), isEmpty);
+    // Just outside the window the cap applies again.
+    await db.update('messages', {'created_at': now - const Duration(hours: 49).inMilliseconds,
+      'permanent_failure': 0});
+    expect(await repo.dueForSend(8, 10), isEmpty);
+  });
   test('late transient failure cannot restart a permanently stopped row', () async {
     await repo.resetForRetry(1);
     await repo.markFailed(1, 1, 0, 'HTTP 401', permanent: true);

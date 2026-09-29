@@ -144,16 +144,25 @@ class ApiClient {
         return SendResult.acknowledgement(res.data);
       }
       if (code == 409 && _looksDuplicate(res.data)) {
-        // A replay/config conflict must not silently acknowledge a queued SMS.
-        return SendResult.acknowledgement(res.data);
-      }
-      if (code == 408 || code == 429) {
-        return SendResult(SendOutcome.transient, 'HTTP $code');
+        // The server already stored this SMS: delivered. Prefer a well-formed
+        // acknowledgement body, else record a plain duplicate acknowledgement.
+        final ack = SendResult.acknowledgement(res.data);
+        if (ack.outcome == SendOutcome.success) return ack;
+        return const SendResult(SendOutcome.success, 'duplicate acknowledged',
+          reasonCode: 'duplicate');
       }
       if (code >= 300 && code < 400) {
         return const SendResult(SendOutcome.permanent, 'redirect refused');
       }
-      if (code >= 400 && code < 500) {
+      // Payment evidence must never be dropped over something that can heal:
+      // clock skew (400 invalid_timestamp), a wrong/rotated secret or a server
+      // auth misconfiguration being fixed (401/403), 409 replay (a retry signs a
+      // fresh nonce), 408/429 and every 5xx. Only a genuinely malformed payload
+      // is permanent.
+      if (code == 400 && _bodyMentions(res.data, 'invalid_timestamp')) {
+        return const SendResult(SendOutcome.transient, 'HTTP 400 invalid_timestamp');
+      }
+      if (code == 400 || code == 413 || code == 422) {
         return SendResult(SendOutcome.permanent, 'HTTP $code');
       }
       return SendResult(SendOutcome.transient, 'HTTP $code');
@@ -221,10 +230,24 @@ class ApiClient {
     return null;
   }
 
+  static const _duplicateMarkers = {'duplicate', 'already_stored'};
+
   bool _looksDuplicate(dynamic data) {
     if (data is Map) {
-      final s = (data['status'] ?? data['result'] ?? '').toString().toLowerCase();
-      return s == 'duplicate';
+      for (final k in const ['status', 'result', 'reason_code', 'error', 'code']) {
+        final v = (data[k] ?? '').toString().toLowerCase();
+        if (_duplicateMarkers.contains(v)) return true;
+      }
+    }
+    return false;
+  }
+
+  /// True when a JSON error body carries [marker] in a machine-readable field.
+  bool _bodyMentions(dynamic data, String marker) {
+    if (data is Map) {
+      for (final k in const ['error', 'reason_code', 'code', 'status', 'result']) {
+        if ((data[k] ?? '').toString().toLowerCase() == marker) return true;
+      }
     }
     return false;
   }
